@@ -73,11 +73,11 @@ function mapType(type, value) {
 const LITERALS = {
   NumericLiteral: "num",
   Identifier: "iden",
-  BinaryExpression: "bol",
+  BooleanLiteral: "bol",
   StringLiteral: "str"
 };
 
-const COMPARE_OPERATORS = ["==", ">=", "<=", "<", ">"];
+const COMPARE_OPERATORS = ["!=", "==", ">=", "<=", "<", ">"];
 const OPERATORS = [
   "!=",
   "==",
@@ -95,11 +95,7 @@ const OPERATORS = [
 ];
 
 function isSimpleForm(_node) {
-  return (
-    OPERATORS.includes(_node.operator) &&
-    _node.left.type in LITERALS &&
-    _node.right.type in LITERALS
-  );
+  return OPERATORS.includes(_node.operator);
 }
 
 function getNamesOnlyUsedOnce(body) {
@@ -135,7 +131,13 @@ function getNamesOnlyUsedOnce(body) {
     }
 
     for (const key in node) {
-      _get(node[key], insideTest || key === "test" || key === "arguments");
+      const v =
+        insideTest ||
+        key === "test" ||
+        key === "arguments" ||
+        key === "update";
+        // (key === "right" && node.type === "ForOfStatement");
+      _get(node[key], v);
     }
   }
 
@@ -216,6 +218,18 @@ function ast2asc(ast, js) {
           ["iden", _node.object.name],
           ["ctnr", "len"]
         ];
+      } else if (
+        _node.object.type === "Identifier" &&
+        _node.property.type === 'BinaryExpression' &&
+        _node.property.operator === "-" &&
+        _node.property.right.type === 'NumericLiteral' &&
+        _node.property.right.value === 1 
+      ) {
+        return [
+          ['iden', _node.object.name],
+          ['ctnr', 'subs'],
+          getTripleProp(_node.property.left)
+        ]
       } else {
         console.log(_node);
         throw new Error();
@@ -259,13 +273,33 @@ function ast2asc(ast, js) {
     return false;
   }
 
+  /**
+   * Get the triple tuple representation (used in Wenyan ASC) of a node
+   * 
+   * @param {Node} _node 
+   * @param {boolean} canUseStaged 
+   */
   function getTripleProp(_node, canUseStaged = true) {
+    function wrap() {
+      // if (canUseStaged) {
+      //   return ['ans', null];
+      // }
+
+      const name = getNextTmpName();
+      ans.push({
+        op: "name",
+        names: [name]
+      });
+      return ["iden", name, _node.start];
+    }
+
     if (_node.type === "CallExpression") {
       return ["data", js.slice(_node.start, _node.end), _node.start];
     }
 
     if (_node.type === "MemberExpression") {
-      notImpErr(_node);
+      process(_node);
+      return wrap();
     }
 
     if (_node.type === "VariableDeclaration") {
@@ -274,12 +308,38 @@ function ast2asc(ast, js) {
       return ["iden", names[0], _node.start];
     }
 
+    if (
+      _node.type === "BinaryExpression" ||
+      _node.type === "LogicalExpression"
+    ) {
+      process(_node);
+      return wrap();
+    }
+
+    if (_node.type === 'UnaryExpression') {
+      if (_node.operator === '-') {
+        if (_node.argument.type === 'NumericLiteral') {
+          return ['num', -_node.argument.value];
+        }
+
+        ans.push({
+          op: 'op-',
+          lhs: ['num', 0],
+          rhs: getTripleProp(_node.argument)
+        })
+
+        return wrap();
+      } else {
+        notImpErr();
+      }
+    }
+
     if (!(_node.type in LITERAL_TYPES)) {
       notImpErr();
     }
 
     if (_node.type === "Identifier") {
-      if (tryToCompress(_node.name) && canUseStaged) {
+      if (canUseStaged && tryToCompress(_node.name)) {
         return ["ans", null];
       }
 
@@ -352,16 +412,7 @@ function ast2asc(ast, js) {
 
   function addIfTestExpression(_node) {
     if (_node.test.type === "BinaryExpression") {
-      if (isSimpleForm(_node.test)) {
-        ans.push({
-          op: "if",
-          test: [
-            getTripleProp(_node.test.left),
-            ["cmp", _node.test.operator],
-            getTripleProp(_node.test.right)
-          ]
-        });
-      } else if (COMPARE_OPERATORS.includes(_node.test.operator)) {
+      if (COMPARE_OPERATORS.includes(_node.test.operator)) {
         ans.push({
           op: "if",
           test: [
@@ -370,15 +421,30 @@ function ast2asc(ast, js) {
             ...getIfProp(_node.test.right)
           ]
         });
+      } else if (_node.test in LITERAL_TYPES) {
+        ans.push({
+          op: "if",
+          test: [getTripleProp(_node.test)]
+        });
       } else {
         notImpErr(_node);
       }
     } else if (_node.test.type in LITERAL_TYPES) {
       ans.push({
         op: "if",
-        test: [getTripleProp(_node.test)],
+        // TODO: it seems we cannot use "ans" in if
+        test: [getTripleProp(_node.test, false)],
         pos: _node.start
       });
+    } else if (
+      _node.test.type === "LogicalExpression" ||
+      _node.test.type === "BinaryExpression"
+    ) {
+      ans.push({
+        op: "if",
+        test: [getTripleProp(_node.test, false)],
+        pos: _node.start
+      })
     } else {
       notImpErr();
     }
@@ -438,6 +504,7 @@ function ast2asc(ast, js) {
         } else if (_node.callee.type.endsWith("MemberExpression")) {
           // Concat
           let isConcat = true;
+          let isSliceOne = false;
           let callExp = _node;
           const allArr = [];
           while (callExp && callExp.type === "CallExpression") {
@@ -451,6 +518,15 @@ function ast2asc(ast, js) {
             callExp = callExp.callee.object;
           }
 
+          if (
+            _node.callee.property.name === "slice" &&
+            _node.arguments.length === 1 &&
+            _node.arguments[0].value === 1 &&
+            _node.callee.object.type === "Identifier"
+          ) {
+            isSliceOne = true;
+          }
+
           if (isConcat) {
             allArr.push(callExp.name);
             ans.push({
@@ -458,8 +534,15 @@ function ast2asc(ast, js) {
               containers: allArr.reverse(),
               pos: _node.start
             });
+          } else if (isSliceOne) {
+            ans.push({
+              op: "subscript",
+              container: _node.callee.object.name,
+              value: ["ctnr", "rest"]
+            });
           } else {
-            notImpErr();
+            // TODO:
+            notImpErr(_node);
           }
         } else {
           notImpErr(_node);
@@ -471,13 +554,7 @@ function ast2asc(ast, js) {
       case "AssignmentExpression":
         assert(_node.operator === "=");
         if (_node.left.type === "Identifier") {
-          if (_node.right.type in LITERALS) {
-            ans.push({
-              op: "reassign",
-              lhs: ["iden", _node.left.name],
-              rhs: getTripleProp(_node.right)
-            });
-          } else if (_node.right.type === "FunctionExpression") {
+          if (_node.right.type === "FunctionExpression") {
             {
               // Assert we have initialized the function
               const last = ans[ans.length - 1];
@@ -487,7 +564,11 @@ function ast2asc(ast, js) {
             }
             addFunction(_node.right);
           } else {
-            notImpErr();
+            ans.push({
+              op: "reassign",
+              lhs: ["iden", _node.left.name],
+              rhs: getTripleProp(_node.right)
+            });
           }
         } else if (_node.left.type.endsWith("Expression")) {
           if (
@@ -660,11 +741,12 @@ function ast2asc(ast, js) {
           op: "break"
         });
         break;
+      case "LogicalExpression":
       case "BinaryExpression":
         if (isSimpleForm(_node)) {
           ans.push({
-            lhs: getTripleProp(_node.left),
-            rhs: getTripleProp(_node.right),
+            lhs: getTripleProp(_node.left, false),
+            rhs: getTripleProp(_node.right, false),
             op: "op" + _node.operator
           });
         } else {
@@ -701,9 +783,10 @@ function ast2asc(ast, js) {
         });
         break;
       case "ForOfStatement":
+        assert(_node.right.type === 'Identifier')
         ans.push({
           op: "for",
-          container: getTripleProp(_node.right)[1],
+          container: _node.right.name,
           iterator: getTripleProp(_node.left)[1]
         });
 
@@ -749,16 +832,18 @@ function ast2asc(ast, js) {
             });
           }
         } else if (_node.property.type in LITERAL_TYPES) {
-          ans.push({
-            lhs: getTripleProp(_node.property),
-            rhs: ["num", 1],
-            op: "op+"
-          });
-          ans.push({
-            op: "subscript",
-            container: object.name,
-            value: ["ans", null]
-          });
+          if (_node.property.name === "length") {
+            ans.push({
+              op: "length",
+              container: object.name
+            });
+          } else {
+            ans.push({
+              op: "subscript",
+              container: object.name,
+              value: ["str", _node.property.name]
+            });
+          }
         } else {
           notImpErr();
         }
