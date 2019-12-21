@@ -1,3 +1,10 @@
+/**
+ * The ASC here is a little bit diff from Wenyan ASC
+ * 
+ * 1. The ASC used here should support `op==`, `op>=`, ...
+ * 2. {op: "op", ...} may include another field called `name`, indicating the the assignment target
+ * 
+ */
 const parser = require("@babel/parser");
 const { num2hanzi } = require("./hanzi2num");
 //「」
@@ -209,10 +216,23 @@ function asc2wy(asc) {
         ans += `除${getValue(node.lhs)}以${getValue(node.rhs)}。所餘幾何。`;
         break;
       case "op||":
-        ans += `夫${getValue(node.lhs)} ${getValue(node.rhs)}中有陽乎。`;
+        ans += `夫${getValue(node.lhs)}${getValue(node.rhs)}中有陽乎。`;
         break;
       case "op&&":
-        ans += `夫${getValue(node.lhs)} ${getValue(node.rhs)}中無陰乎。`;
+        ans += `夫${getValue(node.lhs)}${getValue(node.rhs)}中無陰乎。`;
+        break;
+      case "op==":
+      case "op!=":
+      case "op>":
+      case "op<":
+      case "op>=":
+      case "op<=":
+        // TODO: make this shorter
+        if (node.name == null) {
+          throw new Error();
+        }
+
+        ans += `吾有一爻。名之曰${wrapVar(node.name)}。若${getValue(node.lhs)}${COMPARATORS[node.op.slice(2)]}${getValue(node.rhs)}者。昔之${wrapVar(node.name)}者。今陽是矣云云。`
         break;
       default:
         console.log(node);

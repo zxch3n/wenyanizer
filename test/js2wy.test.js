@@ -7,7 +7,6 @@ var { removeField } = require("./utils");
 
 const _log = console.log;
 function runExample(name) {
-  if (name === "quine" || name === 'quine2') return;
   console.log("======");
   console.log(name);
   console.log("======");

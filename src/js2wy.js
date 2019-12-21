@@ -312,6 +312,12 @@ function ast2asc(ast, js) {
       _node.type === "BinaryExpression" ||
       _node.type === "LogicalExpression"
     ) {
+      // TODO: remove this hotfix in the future version
+      if (COMPARE_OPERATORS.includes(_node.operator)) {
+        _node._name = getNextTmpName();
+        process(_node);
+        return ['iden', _node._name, _node.start];
+      }
       process(_node);
       return wrap();
     }
@@ -620,8 +626,10 @@ function ast2asc(ast, js) {
         declarator.init.type === "UnaryExpression" ||
         declarator.init.type === "LogicalExpression"
       ) {
+        declarator.init._name = name;
         process(declarator.init);
-        if (allVars.includes(name)) {
+        if (COMPARE_OPERATORS.includes(declarator.init.operator)) {
+        } else if (allVars.includes(name)) {
           ans.push({
             op: "reassign",
             lhs: ["iden", name],
@@ -744,10 +752,12 @@ function ast2asc(ast, js) {
       case "LogicalExpression":
       case "BinaryExpression":
         if (isSimpleForm(_node)) {
+          // TODO: remove name hotfix maybe
           ans.push({
             lhs: getTripleProp(_node.left, false),
             rhs: getTripleProp(_node.right, false),
-            op: "op" + _node.operator
+            op: "op" + _node.operator,
+            name: _node._name
           });
         } else {
           notImpErr();
@@ -841,7 +851,7 @@ function ast2asc(ast, js) {
             ans.push({
               op: "subscript",
               container: object.name,
-              value: ["str", _node.property.name]
+              value: ["lit", `"${_node.property.name}"`]
             });
           }
         } else {
