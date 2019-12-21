@@ -1,6 +1,8 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
 
+// TODO: refactor!!
+
 var tmpVars = [];
 var varIndex = 0;
 var allVars = [];
@@ -203,6 +205,28 @@ function ast2asc(ast, js) {
     return newName;
   }
 
+  function getIfProp(_node) {
+    if (_node.type === "MemberExpression") {
+      if (
+        _node.object.type === "Identifier" &&
+        _node.property.type === "Identifier" &&
+        _node.property.name === "length"
+      ) {
+        return [
+          ["iden", _node.object.name],
+          ["ctnr", "len"]
+        ];
+      } else {
+        console.log(_node);
+        throw new Error();
+      }
+    } else if (_node.type in LITERAL_TYPES) {
+      return [getTripleProp(_node)];
+    } else {
+      throw new Error();
+    }
+  }
+
   function tryToCompress(name) {
     if (!namesOnlyUsedOnce.has(name)) {
       return false;
@@ -287,7 +311,7 @@ function ast2asc(ast, js) {
     ans.push({
       op: "fun",
       arity: funcNode.params.length,
-      args: funcNode.params.map(x => {
+      args: funcNode.params.map((x) => {
         const props = getTripleProp(x);
         return {
           name: props[1],
@@ -337,8 +361,17 @@ function ast2asc(ast, js) {
             getTripleProp(_node.test.right)
           ]
         });
+      } else if (COMPARE_OPERATORS.includes(_node.test.operator)) {
+        ans.push({
+          op: "if",
+          test: [
+            ...getIfProp(_node.test.left),
+            ["cmp", _node.test.operator],
+            ...getIfProp(_node.test.right)
+          ]
+        });
       } else {
-        notImpErr();
+        notImpErr(_node);
       }
     } else if (_node.test.type in LITERAL_TYPES) {
       ans.push({

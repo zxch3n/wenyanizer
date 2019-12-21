@@ -7,6 +7,9 @@ var { removeField } = require("./utils");
 
 const _log = console.log;
 function runExample(name) {
+  if (name !== "mergesort") {
+    return;
+  }
   console.log("======");
   console.log(name);
   console.log("======");
