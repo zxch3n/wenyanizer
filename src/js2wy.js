@@ -422,7 +422,7 @@ function ast2asc(ast, js) {
             allArr.push(callExp.name);
             ans.push({
               op: "cat",
-              containers: allArr,
+              containers: allArr.reverse(),
               pos: _node.start
             });
           } else {
