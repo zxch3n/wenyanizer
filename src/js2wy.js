@@ -1,6 +1,7 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
 const { getRandomChineseName } = require('./utils');
+GLOBAL_OBJECTS = ['String', 'document', 'global', 'window', 'Math', 'Object', 'Array', 'Number', '']
 
 // TODO: refactor!!
 // TODO: find a way to make sure registerNewName is invoked after "name" op or "var" op
@@ -298,6 +299,7 @@ function ast2asc(ast, js) {
   varIndex = 0;
   allVars = [];
   varSet = new Map();
+  const signatureCache = {};
   const namesOnlyUsedOnce = getNamesOnlyUsedOnce(ast.program.body);
   const nodes = ast.program.body;
   const ans = [];
@@ -323,7 +325,7 @@ function ast2asc(ast, js) {
     });
 
     // FIXME: get the type
-    registerNewName(name, 'obj');
+    registerNewName(newName, 'obj');
     return newName;
   }
 
@@ -399,6 +401,84 @@ function ast2asc(ast, js) {
   }
 
   /**
+   * This function is used to wrap the global object 
+   * which has not been supported by wenyan.
+   * 
+   * 1. It will create necessary function
+   * 2. Invoke the function
+   * 3. Return the output of it
+   * 
+   * @param {*} _node 
+   */
+  function callJsGlobalFunction(_node) {
+    assert(_node.type === "CallExpression");
+    let signature = "";
+    function _getSignature(target) {
+      if (target.type === "Identifier") {
+        signature += target.name;
+      } else if (target.type === "MemberExpression") {
+        _getSignature(target.object);
+        signature += ".";
+        _getSignature(target.property);
+      } else if (target.type === "CallExpression") {
+        _getSignature(target.callee);
+        signature += '(';
+        for (let i = 0; i < target.arguments.length; i++) {
+          signature += `a${i},`;
+        }
+        signature += ')';
+      } else {
+        notImpErr();
+      }
+    }
+
+    _getSignature(_node);
+    let funcName;
+    if (signature in signatureCache) {
+      funcName = signatureCache[signature];
+    } else {
+      funcName = getNextTmpName();
+      signatureCache[signature] = funcName;
+      // TODO: refactor, extract all func together
+      ans.push({
+        op: "var",
+        count: 1,
+        type: "fun",
+        names: [funcName],
+        values: []
+      });
+
+      ans.push({
+        op: "fun",
+        arity: _node.arguments.length,
+        args: _node.arguments.map((x, index) => {
+          return {type: 'obj', name: `a${index}`};
+        }),
+        pos: _node.start
+      });
+      
+      registerNewName(funcName, "fun");
+      ans.push({
+        op: "funbody",
+      });
+      ans.push({
+        op: "return",
+        value: ['data', signature]
+      })
+      ans.push({
+        op: "funend",
+      });
+    }
+
+    ans.push({
+      op: 'call',
+      fun: funcName,
+      args: _node.arguments.map(getTripleProp),
+      pos: _node.start
+    })
+  }
+
+  /**
    * Get the triple tuple representation (used in Wenyan ASC) of a node
    *
    * @param {Node} _node
@@ -434,9 +514,8 @@ function ast2asc(ast, js) {
         });
         return wrap();
       } else {
-        notImpErr(_node);
-        // TODO: auto-wrap function 
-        return ["data", js.slice(_node.start, _node.end), _node.start];
+        callJsGlobalFunction(_node);
+        return wrap();
       }
     }
 
@@ -462,10 +541,11 @@ function ast2asc(ast, js) {
 
     if (
       _node.type === "BinaryExpression" ||
-      _node.type === "LogicalExpression"
+      _node.type === "LogicalExpression" ||
+      _node.type === 'ObjectExpression'
     ) {
       // TODO: remove this hotfix in the future version
-      if (COMPARE_OPERATORS.includes(_node.operator)) {
+      if (_node.type === "ObjectExpression" || COMPARE_OPERATORS.includes(_node.operator)) {
         _node._name = getNextTmpName();
         process(_node);
         return ["iden", _node._name, _node.start];
@@ -869,14 +949,7 @@ function ast2asc(ast, js) {
 
         if (dtype === 'obj' && declarator.init.properties.length) {
           // TODO: use new Syntax
-          for (const property of declarator.init.properties) {
-            ans.push({
-              op: 'reassign',
-              lhs: ['iden', name],
-              lhssubs: ['lit', `"${property.key.name || property.key.value}"`],
-              rhs: getTripleProp(property.value)
-            });
-          }
+          initObjectProperties(name, declarator.init.properties);
         }
 
         if (dtype === "arr" && declarator.init.elements.length) {
@@ -890,6 +963,17 @@ function ast2asc(ast, js) {
     }
 
     return names;
+  }
+
+  function initObjectProperties(name, properties) {
+    for (const property of properties) {
+      ans.push({
+        op: 'reassign',
+        lhs: ['iden', name],
+        lhssubs: ['lit', `"${property.key.name || property.key.value}"`],
+        rhs: getTripleProp(property.value)
+      });
+    }
   }
 
   function appendDeclaration(dtype, value, name) {
@@ -1007,6 +1091,17 @@ function ast2asc(ast, js) {
           notImpErr(_node);
         }
         break;
+      case "ObjectExpression":
+        assert (_node._name != null)
+        ans.push({
+          op: 'var',
+          count: 1,
+          type: 'obj',
+          names: [_node._name],
+          values: []
+        });
+        initObjectProperties(_node._name, _node.properties);
+        break;
       case "ReturnStatement":
         ans.push({
           op: "return",
@@ -1104,7 +1199,7 @@ function ast2asc(ast, js) {
         break;
       case "MemberExpression":
         let object = _node.object;
-        if (_node.object.type === "CallExpression") {
+        if (_node.object.type === "CallExpression" || object.type === 'MemberExpression') {
           process(_node.object);
           const newVar = saveStagedToNewVar();
           object = {
