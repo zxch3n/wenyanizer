@@ -3,20 +3,6 @@ const { asc2wy } = require("./asc2wy");
 
 // TODO: refactor!!
 
-var tmpVars = [];
-var varIndex = 0;
-var allVars = [];
-function getNextTmpName() {
-  const name = "__tmp$Hv2jEr_" + varIndex;
-  tmpVars.push(name);
-  varIndex++;
-  return name;
-}
-
-function lastVar() {
-  return allVars[allVars.length - 1];
-}
-
 function js2wy(jsStr) {
   const asc = js2asc(jsStr);
   return asc2wy(asc);
@@ -25,7 +11,78 @@ function js2wy(jsStr) {
 function js2asc(jsStr) {
   const jsAst = parse(jsStr);
   const asc = ast2asc(jsAst, jsStr);
+  ascPostProcess(asc);
   return asc;
+}
+
+function ascPostProcess(asc) {
+  function getIdenOnlyUsedOnce() {
+    count = {};
+    function add(name) {
+      if (count[name] == null) {
+        count[name] = 1;
+      } else {
+        count[name]++;
+      }
+    }
+
+    for (const node of asc) {
+      for (const key in node) {
+        if (node[key] && node[key][0] === "iden") {
+          add(node[key][1]);
+        }
+      }
+    }
+
+    const ans = new Set();
+    for (const key in count) {
+      if (count[key] === 1) {
+        ans.add(key);
+      }
+    }
+
+    return ans;
+  }
+
+  function findIgnorableIden(op) {
+    for (const key in op) {
+      if (op[key] && op[key][0] === "iden" && namesOnlyUsedOnce.has(op[key][1])) {
+        return op[key][1];
+      }
+    }
+
+    return undefined;
+  }
+
+  function replaceIgnorableIden(op, name, newData) {
+    for (const key in op) {
+      if (op[key][0] === "iden" && op[key][1] === name) {
+        op[key] = newData;
+        return op;
+      }
+    }
+
+    throw new Error();
+  }
+
+  const namesOnlyUsedOnce = getIdenOnlyUsedOnce();
+  for (let i = 1; i < asc.length; i++) {
+    const ignorable = findIgnorableIden(asc[i]);
+    if (ignorable == null) {
+      continue;
+    }
+
+    if (
+      asc[i - 1].op === "var" &&
+      asc[i - 1].values.length === 1 &&
+      asc[i - 1].names.length === 1 &&
+      asc[i - 1].names[0] === ignorable
+    ) {
+      replaceIgnorableIden(asc[i], ignorable, asc[i - 1].values[0]);
+      asc.splice(i - 1, 1);
+      i--;
+    }
+  }
 }
 
 const LITERAL_TYPES = {
@@ -45,6 +102,16 @@ const DECLARATION_TYPES = Object.assign(
   },
   LITERAL_TYPES
 );
+
+var tmpVars = [];
+var varIndex = 0;
+var allVars = [];
+function getNextTmpName() {
+  const name = "__tmp$Hv2jEr_" + varIndex;
+  tmpVars.push(name);
+  varIndex++;
+  return name;
+}
 
 function mapType(type, value) {
   if (DECLARATION_TYPES[type]) {
@@ -77,7 +144,7 @@ const LITERALS = {
   StringLiteral: "str"
 };
 
-const COMPARE_OPERATORS = ["!=", "==", ">=", "<=", "<", ">"];
+const COMPARE_OPERATORS = ["!=", "==", ">=", "<=", "<", ">", '===', '!=='];
 const OPERATORS = [
   "!=",
   "==",
@@ -132,11 +199,8 @@ function getNamesOnlyUsedOnce(body) {
 
     for (const key in node) {
       const v =
-        insideTest ||
-        key === "test" ||
-        key === "arguments" ||
-        key === "update";
-        // (key === "right" && node.type === "ForOfStatement");
+        insideTest || key === "test" || key === "arguments" || key === "update";
+      // (key === "right" && node.type === "ForOfStatement");
       _get(node[key], v);
     }
   }
@@ -150,6 +214,45 @@ function getNamesOnlyUsedOnce(body) {
   }
 
   return ans;
+}
+
+function isReassigned(name, node) {
+  if (!node || typeof node !== 'object') {
+    return false;
+  }
+
+  if (
+    node.left &&
+    node.left.name === name &&
+    node.type === "AssignmentExpression"
+  ) {
+    return true;
+  }
+
+  if (
+    node.type === 'UpdateExpression' &&
+    node.argument.name === name
+  ) {
+    return true;
+  }
+
+  if (node instanceof Array) {
+    for (const sub of node) {
+      if (isReassigned(name, sub)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  for (const key in node) {
+    if (node.hasOwnProperty(key) && isReassigned(name, node[key])) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function isIteratingFromZeroToN(_node) {
@@ -220,22 +323,27 @@ function ast2asc(ast, js) {
         ];
       } else if (
         _node.object.type === "Identifier" &&
-        _node.property.type === 'BinaryExpression' &&
+        _node.property.type === "BinaryExpression" &&
         _node.property.operator === "-" &&
-        _node.property.right.type === 'NumericLiteral' &&
-        _node.property.right.value === 1 
+        _node.property.right.type === "NumericLiteral" &&
+        _node.property.right.value === 1
       ) {
         return [
-          ['iden', _node.object.name],
-          ['ctnr', 'subs'],
+          ["iden", _node.object.name],
+          ["ctnr", "subs"],
           getTripleProp(_node.property.left)
-        ]
+        ];
       } else {
         console.log(_node);
         throw new Error();
       }
     } else if (_node.type in LITERAL_TYPES) {
       return [getTripleProp(_node)];
+    } else if (
+      _node.type === "BinaryExpression" ||
+      _node.type === "LogicalExpression"
+    ) {
+      return [getTripleProp(_node, false)];
     } else {
       throw new Error();
     }
@@ -275,9 +383,9 @@ function ast2asc(ast, js) {
 
   /**
    * Get the triple tuple representation (used in Wenyan ASC) of a node
-   * 
-   * @param {Node} _node 
-   * @param {boolean} canUseStaged 
+   *
+   * @param {Node} _node
+   * @param {boolean} canUseStaged
    */
   function getTripleProp(_node, canUseStaged = true) {
     function wrap() {
@@ -316,23 +424,23 @@ function ast2asc(ast, js) {
       if (COMPARE_OPERATORS.includes(_node.operator)) {
         _node._name = getNextTmpName();
         process(_node);
-        return ['iden', _node._name, _node.start];
+        return ["iden", _node._name, _node.start];
       }
       process(_node);
       return wrap();
     }
 
-    if (_node.type === 'UnaryExpression') {
-      if (_node.operator === '-') {
-        if (_node.argument.type === 'NumericLiteral') {
-          return ['num', -_node.argument.value];
+    if (_node.type === "UnaryExpression") {
+      if (_node.operator === "-") {
+        if (_node.argument.type === "NumericLiteral") {
+          return ["num", -_node.argument.value];
         }
 
         ans.push({
-          op: 'op-',
-          lhs: ['num', 0],
+          op: "op-",
+          lhs: ["num", 0],
           rhs: getTripleProp(_node.argument)
-        })
+        });
 
         return wrap();
       } else {
@@ -402,7 +510,10 @@ function ast2asc(ast, js) {
 
   function createTempVarToWrap(values, type = undefined, names = []) {
     const tripleRep = values.map(getTripleProp);
-    type = type || tripleRep[0][0];
+    ({ type } = preprocessTypeValueBeforeDeclare(
+      type || tripleRep[0][0],
+      values[0]
+    ));
     if (type === "iden") {
       // FIXME:
       type = "obj";
@@ -450,7 +561,7 @@ function ast2asc(ast, js) {
         op: "if",
         test: [getTripleProp(_node.test, false)],
         pos: _node.start
-      })
+      });
     } else {
       notImpErr();
     }
@@ -597,6 +708,30 @@ function ast2asc(ast, js) {
           notImpErr();
         }
         break;
+      case "UpdateExpression":
+        if (_node.operator === '++') {
+          ans.push({
+            op: 'op+',
+            lhs: ['iden', _node.argument.name],
+            rhs: ['num', 1, _node.start]
+          });
+
+        } else if (_node.operator === '--') {
+          ans.push({
+            op: 'op-',
+            lhs: ['iden', _node.argument.name],
+            rhs: ['num', 1, _node.start]
+          });
+        } else {
+          notImpErr();
+        }
+
+        ans.push({
+          op:  'reassign',
+          lhs: ['iden', _node.argument.name],
+          rhs: ['ans', null]
+        })
+        break;
       default:
         throwError(`Unknown expression ${_node.expression.type}`);
     }
@@ -606,9 +741,6 @@ function ast2asc(ast, js) {
     const names = [];
     for (let i = 0; i < _node.declarations.length; i++) {
       const declarator = _node.declarations[i];
-      const op =
-        DECLARATION_TYPES[declarator.type] ||
-        throwError(`Type ${declarator.type} not support.`);
       const name = declarator.id.name;
       if (declarator.init == null) {
         ans.push({
@@ -646,37 +778,8 @@ function ast2asc(ast, js) {
       } else {
         let value = declarator.init.value || declarator.init.name;
         const dtype = mapType(declarator.init.type || typeof value, value);
-        let type = dtype;
-        let toIgnoreValues = type === "fun" || type === "arr" || type === "obj";
-        if (type === "iden") {
-          type = varTypeMap.get(value) || "obj";
-          // Try to compress
-          const name = value;
-          if (namesOnlyUsedOnce.has(name)) {
-            const last = ans[ans.length - 1];
-          }
-        }
-        if (type === "bool") {
-          type = "bol";
-        }
-        if (dtype === "lit") {
-          type = "str";
-          if (value) {
-            value = `"${value}"`;
-          } else {
-            toIgnoreValues = true;
-          }
-        }
-        allVars.push(name);
-        ans.push({
-          op,
-          type,
-          count: 1,
-          values: toIgnoreValues ? [] : [[dtype, value]],
-          names: [name]
-        });
-
-        varTypeMap.set(name, type);
+        appendDeclaration(dtype, value, name);
+        names.push(name);
         if (dtype === "fun" && declarator.init.body.extra.raw !== "0") {
           // TODO:
           notImpErr();
@@ -686,12 +789,54 @@ function ast2asc(ast, js) {
         if (dtype === "arr" && declarator.init.elements.length) {
           notImpErr();
         }
-
-        names.push(name);
       }
     }
 
     return names;
+  }
+
+  function appendDeclaration(dtype, value, name) {
+    let type;
+    let toIgnoreValues;
+    ({ type, toIgnoreValues, value } = preprocessTypeValueBeforeDeclare(
+      dtype,
+      value
+    ));
+    ans.push({
+      op: "var",
+      type,
+      count: 1,
+      values: toIgnoreValues ? [] : [[dtype, value]],
+      names: [name]
+    });
+
+    allVars.push(name);
+    varTypeMap.set(name, type);
+  }
+
+  function preprocessTypeValueBeforeDeclare(dtype, value) {
+    let type = dtype;
+    let toIgnoreValues = type === "fun" || type === "arr" || type === "obj";
+    if (type === "iden") {
+      type = varTypeMap.get(value) || "obj";
+      // Try to compress
+      const name = value;
+      if (namesOnlyUsedOnce.has(name)) {
+        const last = ans[ans.length - 1];
+      }
+    }
+    if (type === "bool") {
+      type = "bol";
+    }
+    if (dtype === "lit") {
+      type = "str";
+      if (value) {
+        value = `"${value}"`;
+      } else {
+        toIgnoreValues = true;
+      }
+    }
+    return { type, toIgnoreValues, value };
   }
 
   function process(_node) {
@@ -701,6 +846,9 @@ function ast2asc(ast, js) {
         break;
       case "ExpressionStatement":
         addExpressionStatement(_node.expression);
+        break;
+      case "UpdateExpression":
+        addExpressionStatement(_node);
         break;
       case "CallExpression":
         addExpressionStatement(_node);
@@ -773,8 +921,34 @@ function ast2asc(ast, js) {
       case "ForStatement":
         // TODO: Currently it only supports `for (let i = 0; i < n; i++)`,
         // or `for (const a of b)`
+        const initName = _node.init.declarations[0].id.name;
+        let shouldAddManualBreak =
+          !_node.init ||
+          !_node.init.declarations.length ||
+          _node.init.declarations[0].init.value !== 0 ||
+          !_node.update ||
+          _node.update.operator !== "++" ||
+          _node.update.argument.name !== initName ||
+          (_node.test &&
+            (_node.test.left.name !== initName ||
+              _node.test.operator !== "<" ||
+              _node.test.right.type !== "NumericLiteral")) ||
+          isReassigned(initName, _node.body);
+        const shouldInit = shouldAddManualBreak || (
+          _node.init &&
+          _node.init.declarations &&
+          _node.init.declarations[0] &&
+          !_node.init.declarations[0].id.name.startsWith("_rand"));
 
-        if (isIteratingFromZeroToN(_node)) {
+        if (shouldInit) {
+          appendDeclaration('num', _node.init.declarations[0].init.value, initName);
+        }
+
+        if (shouldAddManualBreak) {
+          ans.push({
+            op: 'whiletrue'
+          })
+        } else if (isIteratingFromZeroToN(_node)) {
           ans.push({
             op: "whilen",
             value: getTripleProp(_node.test.right),
@@ -788,12 +962,36 @@ function ast2asc(ast, js) {
           process(subNode);
         }
 
+        if (_node.test && shouldAddManualBreak) {
+          ans.push({
+            op: 'if',
+            test: [
+              getTripleProp(_node.test),
+              ['cmp', '=='],
+              ['bool', false]
+            ]
+          });
+
+          ans.push({
+            op: 'break'
+          });
+
+          ans.push({
+            op: 'end'
+          });
+        }
+
+        if (shouldInit) {
+          // Update
+          process(_node.update);
+        }
+
         ans.push({
           op: "end"
         });
         break;
       case "ForOfStatement":
-        assert(_node.right.type === 'Identifier')
+        assert(_node.right.type === "Identifier");
         ans.push({
           op: "for",
           container: _node.right.name,
@@ -871,6 +1069,16 @@ function ast2asc(ast, js) {
           lhs: getTripleProp(_node.left),
           rhs: getTripleProp(_node.right)
         });
+        break;
+      case "FunctionDeclaration":
+        ans.push({
+          op: "var",
+          count: 1,
+          type: "fun",
+          names: [_node.id.name],
+          values: []
+        });
+        addFunction(_node);
         break;
       case "EmptyStatement":
         break;

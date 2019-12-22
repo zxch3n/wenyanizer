@@ -11,7 +11,9 @@ const { num2hanzi } = require("./hanzi2num");
 
 const COMPARATORS = {
   "==": "等於",
+  "===": "等於",
   "!=": "不等於",
+  "!==": "不等於",
   "<=": "不大於",
   ">=": "不小於",
   ">": "大於",
@@ -222,7 +224,9 @@ function asc2wy(asc) {
         ans += `夫${getValue(node.lhs)}${getValue(node.rhs)}中無陰乎。`;
         break;
       case "op==":
+      case "op===":
       case "op!=":
+      case "op!==":
       case "op>":
       case "op<":
       case "op>=":
