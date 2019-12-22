@@ -8,5 +8,5 @@ const a = Object.assign(
   }
 );
 
-b['a'] = [4, 1];
+b['c'] = [4, 1];
 console.log(JSON.stringify(a));
