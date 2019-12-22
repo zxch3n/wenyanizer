@@ -402,10 +402,22 @@ function ast2asc(ast, js) {
     }
 
     if (_node.type === "CallExpression") {
-      return ["data", js.slice(_node.start, _node.end), _node.start];
+      if (allVars.includes(_node.callee.name)) {
+        ans.push({
+          op: 'call',
+          fun: _node.callee.name,
+          args: _node.arguments.map(getTripleProp),
+          pos: _node.start
+        });
+        return wrap();
+      } else {
+        notImpErr(_node);
+        // TODO: auto-wrap function 
+        return ["data", js.slice(_node.start, _node.end), _node.start];
+      }
     }
 
-    if (_node.type === "MemberExpression") {
+    if (_node.type === "MemberExpression" || _node.type === "CallExpression") {
       process(_node);
       return wrap();
     }
@@ -444,12 +456,12 @@ function ast2asc(ast, js) {
 
         return wrap();
       } else {
-        notImpErr();
+        notImpErr(_node);
       }
     }
 
     if (!(_node.type in LITERAL_TYPES)) {
-      notImpErr();
+      notImpErr(_node);
     }
 
     if (_node.type === "Identifier") {
@@ -478,7 +490,7 @@ function ast2asc(ast, js) {
   function notImpErr(_node = node) {
     const errorSnippet = js.slice(_node.start, _node.end);
     console.log(errorSnippet);
-    throw new Error("NotImplementedError");
+    throw new Error(`NotImplementedError, in ${_node.loc.start}`);
   }
 
   function addFunction(funcNode) {
@@ -509,7 +521,7 @@ function ast2asc(ast, js) {
   }
 
   function createTempVarToWrap(values, type = undefined, names = []) {
-    const tripleRep = values.map(getTripleProp);
+    const tripleRep = values.map(x => getTripleProp(x, false));
     ({ type } = preprocessTypeValueBeforeDeclare(
       type || tripleRep[0][0],
       values[0]
@@ -563,7 +575,7 @@ function ast2asc(ast, js) {
         pos: _node.start
       });
     } else {
-      notImpErr();
+      notImpErr(_node);
     }
   }
 
@@ -676,7 +688,7 @@ function ast2asc(ast, js) {
               // Assert we have initialized the function
               const last = ans[ans.length - 1];
               if (last.op !== "var" || last.names[0] !== _node.left.name) {
-                notImpErr();
+                notImpErr(_node);
               }
             }
             addFunction(_node.right);
@@ -702,10 +714,10 @@ function ast2asc(ast, js) {
               rhs: getTripleProp(_node.right, true)
             });
           } else {
-            notImpErr();
+            notImpErr(_node);
           }
         } else {
-          notImpErr();
+          notImpErr(_node);
         }
         break;
       case "UpdateExpression":
@@ -723,7 +735,7 @@ function ast2asc(ast, js) {
             rhs: ['num', 1, _node.start]
           });
         } else {
-          notImpErr();
+          notImpErr(_node);
         }
 
         ans.push({
@@ -782,12 +794,12 @@ function ast2asc(ast, js) {
         names.push(name);
         if (dtype === "fun" && declarator.init.body.extra.raw !== "0") {
           // TODO:
-          notImpErr();
+          notImpErr(_node);
           addFunction();
         }
 
         if (dtype === "arr" && declarator.init.elements.length) {
-          notImpErr();
+          notImpErr(_node);
         }
       }
     }
@@ -861,7 +873,7 @@ function ast2asc(ast, js) {
             });
           }
         } else {
-          notImpErr();
+          notImpErr(_node);
         }
 
         for (const subNode of _node.body.body) {
@@ -908,7 +920,7 @@ function ast2asc(ast, js) {
             name: _node._name
           });
         } else {
-          notImpErr();
+          notImpErr(_node);
         }
         break;
       case "ReturnStatement":
@@ -955,7 +967,7 @@ function ast2asc(ast, js) {
             pos: _node.start
           });
         } else {
-          notImpErr();
+          notImpErr(_node);
         }
 
         for (const subNode of _node.body.body) {
@@ -1053,7 +1065,7 @@ function ast2asc(ast, js) {
             });
           }
         } else {
-          notImpErr();
+          notImpErr(_node);
         }
         break;
       case "UnaryExpression":
@@ -1083,7 +1095,7 @@ function ast2asc(ast, js) {
       case "EmptyStatement":
         break;
       default:
-        notImpErr();
+        notImpErr(_node);
     }
   }
 
