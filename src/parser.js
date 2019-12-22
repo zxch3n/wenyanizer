@@ -817,15 +817,11 @@ function compile(
       targ = asc2js(asc);
       break;
     case "py":
-      try {
-        asc2py = require("./asc2py.js");
-      } catch (e) {}
+      asc2py = require("./asc2py.js");
       targ = asc2py(asc);
       break;
     case "rb":
-      try {
-        asc2rb = require("./asc2rb.js");
-      } catch (e) {}
+      asc2rb = require("./asc2rb.js");
       targ = asc2rb(asc);
       break;
     default:
@@ -892,4 +888,4 @@ var parser = {
 };
 try {
   module.exports = parser;
-} catch (e) {}
+} catch (e) {console.error(e)}

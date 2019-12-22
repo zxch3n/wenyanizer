@@ -1,6 +1,6 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
-const { getRandomChineseName } = require('./utils');
+const { getRandomChineseName, LAMBDA } = require('./utils');
 GLOBAL_OBJECTS = ['String', 'document', 'global', 'window', 'Math', 'Object', 'Array', 'Number', '']
 
 // TODO: refactor!!
@@ -350,14 +350,14 @@ function ast2asc(ast, js) {
         return [
           ["iden", _node.object.name],
           ["ctnr", "subs"],
-          getTripleProp(_node.property.left)
+          getTripleProp(_node.property.left, false)
         ];
       } else {
         console.log(_node);
         throw new Error();
       }
     } else if (_node.type in LITERAL_TYPES) {
-      return [getTripleProp(_node)];
+      return [getTripleProp(_node, false)];
     } else if (
       _node.type === "BinaryExpression" ||
       _node.type === "LogicalExpression"
@@ -413,6 +413,7 @@ function ast2asc(ast, js) {
   function callJsGlobalFunction(_node) {
     assert(_node.type === "CallExpression");
     let signature = "";
+    const args = [];
     function _getSignature(target) {
       if (target.type === "Identifier") {
         signature += target.name;
@@ -422,9 +423,12 @@ function ast2asc(ast, js) {
         _getSignature(target.property);
       } else if (target.type === "CallExpression") {
         _getSignature(target.callee);
+        assert(target.arguments.length <= LAMBDA.length);
         signature += '(';
         for (let i = 0; i < target.arguments.length; i++) {
-          signature += `a${i},`;
+          const name = "子" + LAMBDA[i];
+          signature += `${name},`;
+          args.push(name)
         }
         signature += ')';
       } else {
@@ -452,7 +456,7 @@ function ast2asc(ast, js) {
         op: "fun",
         arity: _node.arguments.length,
         args: _node.arguments.map((x, index) => {
-          return {type: 'obj', name: `a${index}`};
+          return {type: 'obj', name: args[index]};
         }),
         pos: _node.start
       });
@@ -473,7 +477,7 @@ function ast2asc(ast, js) {
     ans.push({
       op: 'call',
       fun: funcName,
-      args: _node.arguments.map(getTripleProp),
+      args: _node.arguments.map(x => getTripleProp(x, false)),
       pos: _node.start
     })
   }
@@ -484,15 +488,15 @@ function ast2asc(ast, js) {
    * @param {Node} _node
    * @param {boolean} canUseStaged
    */
-  function getTripleProp(_node, canUseStaged = true) {
+  function getTripleProp(_node, canUseStaged = false) {
     if (_node == null) {
       return undefined;
     }
 
     function wrap() {
-      // if (canUseStaged) {
-      //   return ['ans', null];
-      // }
+      if (canUseStaged) {
+        return ['ans', null];
+      }
 
       const name = getNextTmpName();
       ans.push({
@@ -509,7 +513,7 @@ function ast2asc(ast, js) {
         ans.push({
           op: 'call',
           fun: _node.callee.name,
-          args: _node.arguments.map(getTripleProp),
+          args: _node.arguments.map(x => getTripleProp(x, false)),
           pos: _node.start
         });
         return wrap();
@@ -563,14 +567,14 @@ function ast2asc(ast, js) {
         ans.push({
           op: "op-",
           lhs: ["num", 0],
-          rhs: getTripleProp(_node.argument)
+          rhs: getTripleProp(_node.argument, true)
         });
 
         return wrap();
       } else if (_node.operator === '!') {
         ans.push({
           op: 'not',
-          value: getTripleProp(_node.argument),
+          value: getTripleProp(_node.argument, true),
           pos: _node.start
         });
         return wrap();
@@ -680,7 +684,7 @@ function ast2asc(ast, js) {
       } else if (_node.test in LITERAL_TYPES) {
         ans.push({
           op: "if",
-          test: [getTripleProp(_node.test)]
+          test: [getTripleProp(_node.test, false)]
         });
       } else {
         notImpErr(_node);
@@ -714,7 +718,7 @@ function ast2asc(ast, js) {
           ans.push({
             op: "call",
             fun: _node.callee.name,
-            args: _node.arguments.map(getTripleProp),
+            args: _node.arguments.map(x => getTripleProp(x, false)),
             pos: _node.start
           });
         } else if (_node.callee.object.name === "console") {
@@ -756,7 +760,7 @@ function ast2asc(ast, js) {
             op: "push",
             container: _node.callee.object.name,
             pos: _node.callee.object.start,
-            values: _node.arguments.map(getTripleProp)
+            values: _node.arguments.map(x => getTripleProp(x, false))
           });
         } else if (_node.callee.type.endsWith("MemberExpression")) {
           // Concat
@@ -824,7 +828,7 @@ function ast2asc(ast, js) {
             ans.push({
               op: "reassign",
               lhs: ["iden", _node.left.name],
-              rhs: getTripleProp(_node.right)
+              rhs: getTripleProp(_node.right, true)
             });
           }
         } else if (_node.left.type.endsWith("Expression")) {
@@ -834,7 +838,7 @@ function ast2asc(ast, js) {
             _node.left.property.operator === "-" &&
             _node.left.property.right.value === 1
           ) {
-            lhssubs = getTripleProp(_node.left.property.left);
+            lhssubs = getTripleProp(_node.left.property.left, true);
             ans.push({
               op: "reassign",
               lhssubs,
@@ -956,7 +960,7 @@ function ast2asc(ast, js) {
           ans.push({
             op: 'push',
             container: name,
-            values: declarator.init.elements.map(getTripleProp)
+            values: declarator.init.elements.map(x => getTripleProp(x, false))
           })
         }
       }
@@ -971,7 +975,7 @@ function ast2asc(ast, js) {
         op: 'reassign',
         lhs: ['iden', name],
         lhssubs: ['lit', `"${property.key.name || property.key.value}"`],
-        rhs: getTripleProp(property.value)
+        rhs: getTripleProp(property.value, true)
       });
     }
   }
@@ -1083,7 +1087,7 @@ function ast2asc(ast, js) {
           // TODO: remove name hotfix maybe
           ans.push({
             lhs: getTripleProp(_node.left, false),
-            rhs: getTripleProp(_node.right, false),
+            rhs: getTripleProp(_node.right, true),
             op: "op" + _node.operator,
             name: _node._name
           });
@@ -1103,11 +1107,15 @@ function ast2asc(ast, js) {
         initObjectProperties(_node._name, _node.properties);
         break;
       case "ReturnStatement":
-        ans.push({
+        const v = {
           op: "return",
-          value: getTripleProp(_node.argument),
+          value: getTripleProp(_node.argument, false),
           pos: _node.start
-        });
+        };
+        if (v.value == null) {
+          delete v.value;
+        }
+        ans.push(v);
         break;
       case "ForStatement":
         // TODO: Currently it only supports `for (let i = 0; i < n; i++)`,
@@ -1186,7 +1194,7 @@ function ast2asc(ast, js) {
         ans.push({
           op: "for",
           container: _node.right.name,
-          iterator: getTripleProp(_node.left)[1]
+          iterator: getTripleProp(_node.left, false)[1]
         });
 
         for (const subNode of _node.body.body) {
@@ -1220,7 +1228,7 @@ function ast2asc(ast, js) {
             ans.push({
               op: "subscript",
               container: object.name,
-              value: getTripleProp(_node.property.left)
+              value: getTripleProp(_node.property.left, true)
             });
           } else {
             process(_node.property);
@@ -1278,7 +1286,7 @@ function ast2asc(ast, js) {
         ans.push({
           op: 'push',
           container: name,
-          values: _node.elements.map(getTripleProp)
+          values: _node.elements.map(x => getTripleProp(x, false))
         });
 
         if (_node._name == null) {
@@ -1295,7 +1303,7 @@ function ast2asc(ast, js) {
       case "UnaryExpression":
         ans.push({
           op: "not",
-          value: getTripleProp(_node.argument),
+          value: getTripleProp(_node.argument, true),
           pos: _node.start
         });
         break;
@@ -1303,7 +1311,7 @@ function ast2asc(ast, js) {
         ans.push({
           op: "op" + _node.operator,
           lhs: getTripleProp(_node.left),
-          rhs: getTripleProp(_node.right)
+          rhs: getTripleProp(_node.right, true)
         });
         break;
       case "FunctionDeclaration":
