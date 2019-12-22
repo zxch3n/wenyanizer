@@ -246,7 +246,7 @@ function asc2wy(asc) {
   }
 
   function addWhile(node) {
-    assert(node.value.length === 3);
+    assert(node.value.length >= 2);
     addIndent();
     ans += `為是${getValue(node.value)}遍。\n`;
   }

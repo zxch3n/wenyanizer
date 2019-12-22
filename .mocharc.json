@@ -1,0 +1,3 @@
+{
+  "ignore": "./test/{jsTestCases|log}/*"
+}

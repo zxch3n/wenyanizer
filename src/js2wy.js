@@ -426,7 +426,9 @@ function ast2asc(ast, js) {
         assert(target.arguments.length <= LAMBDA.length);
         signature += '(';
         for (let i = 0; i < target.arguments.length; i++) {
-          const name = "子" + LAMBDA[i];
+          // Chinese char may introduce error
+          // const name = "子" + LAMBDA[i];
+          const name = "_a" + i;
           signature += `${name},`;
           args.push(name)
         }
@@ -1150,7 +1152,7 @@ function ast2asc(ast, js) {
           (_node.test &&
             (_node.test.left.name !== initName ||
               _node.test.operator !== "<" ||
-              _node.test.right.type !== "NumericLiteral")) ||
+              !(_node.test.right.type in LITERAL_TYPES))) ||
           isReassigned(initName, _node.body);
         const shouldInit = shouldAddManualBreak || (
           _node.init &&
