@@ -1,5 +1,6 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
+const { getRandomChineseName } = require('./utils');
 
 // TODO: refactor!!
 
@@ -104,10 +105,10 @@ const DECLARATION_TYPES = Object.assign(
 );
 
 var tmpVars = [];
-var varIndex = 0;
 var allVars = [];
+var varSet = new Set();
 function getNextTmpName() {
-  const name = "__tmp$Hv2jEr_" + varIndex;
+  const name = getRandomChineseName(varSet);
   tmpVars.push(name);
   varIndex++;
   return name;
@@ -291,6 +292,7 @@ function ast2asc(ast, js) {
   tmpVars = [];
   varIndex = 0;
   allVars = [];
+  varSet = new Set();
   const namesOnlyUsedOnce = getNamesOnlyUsedOnce(ast.program.body);
   const nodes = ast.program.body;
   const ans = [];
@@ -406,7 +408,7 @@ function ast2asc(ast, js) {
     }
 
     if (_node.type === "CallExpression") {
-      if (allVars.includes(_node.callee.name)) {
+      if (varSet.has(_node.callee.name)) {
         ans.push({
           op: 'call',
           fun: _node.callee.name,
@@ -515,6 +517,7 @@ function ast2asc(ast, js) {
 
   function addFunction(funcNode) {
     allVars.push(funcNode.id.name);
+    varSet.add(funcNode.id.name);
     ans.push({
       op: "fun",
       arity: funcNode.params.length,
@@ -786,6 +789,7 @@ function ast2asc(ast, js) {
     for (let i = 0; i < _node.declarations.length; i++) {
       const declarator = _node.declarations[i];
       const name = declarator.id.name;
+      varSet.add(name);
       if (declarator.init == null) {
         ans.push({
           op,
@@ -805,7 +809,7 @@ function ast2asc(ast, js) {
         declarator.init._name = name;
         process(declarator.init);
         if (COMPARE_OPERATORS.includes(declarator.init.operator)) {
-        } else if (allVars.includes(name)) {
+        } else if (varSet.has(name)) {
           ans.push({
             op: "reassign",
             lhs: ["iden", name],
@@ -817,6 +821,7 @@ function ast2asc(ast, js) {
             names: [name]
           });
           allVars.push(name);
+          varSet.add(name);
         }
         names.push(name);
       } else {
