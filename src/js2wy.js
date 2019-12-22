@@ -388,6 +388,10 @@ function ast2asc(ast, js) {
    * @param {boolean} canUseStaged
    */
   function getTripleProp(_node, canUseStaged = true) {
+    if (_node == null) {
+      return undefined;
+    }
+
     function wrap() {
       // if (canUseStaged) {
       //   return ['ans', null];
@@ -417,9 +421,18 @@ function ast2asc(ast, js) {
       }
     }
 
-    if (_node.type === "MemberExpression" || _node.type === "CallExpression") {
+    if (
+      _node.type === "MemberExpression" ||
+      _node.type === "CallExpression"
+    ) {
       process(_node);
       return wrap();
+    }
+
+    if ( _node.type === "ArrayExpression") {
+        _node._name = getNextTmpName();
+        process(_node);
+        return ["iden", _node._name, _node.start];
     }
 
     if (_node.type === "VariableDeclaration") {
@@ -454,6 +467,13 @@ function ast2asc(ast, js) {
           rhs: getTripleProp(_node.argument)
         });
 
+        return wrap();
+      } else if (_node.operator === '!') {
+        ans.push({
+          op: 'not',
+          value: getTripleProp(_node.argument),
+          pos: _node.start
+        });
         return wrap();
       } else {
         notImpErr(_node);
@@ -494,6 +514,7 @@ function ast2asc(ast, js) {
   }
 
   function addFunction(funcNode) {
+    allVars.push(funcNode.id.name);
     ans.push({
       op: "fun",
       arity: funcNode.params.length,
@@ -567,7 +588,8 @@ function ast2asc(ast, js) {
       });
     } else if (
       _node.test.type === "LogicalExpression" ||
-      _node.test.type === "BinaryExpression"
+      _node.test.type === "BinaryExpression" ||
+      _node.test.type === 'UnaryExpression'
     ) {
       ans.push({
         op: "if",
@@ -710,6 +732,16 @@ function ast2asc(ast, js) {
             ans.push({
               op: "reassign",
               lhssubs,
+              lhs: ["iden", _node.left.object.name],
+              rhs: getTripleProp(_node.right, true)
+            });
+          } else if (
+            _node.left.object.type === "Identifier" &&
+            _node.left.property.type === "NumericLiteral"
+          ) {
+            ans.push({
+              op: "reassign",
+              lhssubs: ['num', _node.left.property.value + 1],
               lhs: ["iden", _node.left.object.name],
               rhs: getTripleProp(_node.right, true)
             });
@@ -1057,15 +1089,50 @@ function ast2asc(ast, js) {
               op: "length",
               container: object.name
             });
-          } else {
+          } else if (_node.property.name != null) {
             ans.push({
               op: "subscript",
               container: object.name,
               value: ["lit", `"${_node.property.name}"`]
             });
+          } else if (_node.property.value != null) {
+            ans.push({
+              op: "subscript",
+              container: object.name,
+              // FIXME: should I plus 1 or not??
+              value: ["num", _node.property.value + 1]
+            })
+          } else {
+            notImpErr(_node);
           }
         } else {
           notImpErr(_node);
+        }
+        break;
+      case "ArrayExpression":
+        const name = _node._name || getNextTmpName();
+        ans.push({
+          op: "var",
+          type: 'arr',
+          count: 1,
+          values: [],
+          names: [name]
+        });
+        ans.push({
+          op: 'push',
+          container: name,
+          values: _node.elements.map(getTripleProp)
+        });
+
+        if (_node._name == null) {
+          // Stage this variable
+          ans.push({
+            op: "var",
+            type: "arr",
+            count: 1,
+            values: [name],
+            names: []
+          });
         }
         break;
       case "UnaryExpression":
