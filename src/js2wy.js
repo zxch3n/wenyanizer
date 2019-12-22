@@ -509,18 +509,8 @@ function ast2asc(ast, js) {
     }
 
     if (_node.type === "CallExpression") {
-      if (varSet.has(_node.callee.name)) {
-        ans.push({
-          op: 'call',
-          fun: _node.callee.name,
-          args: _node.arguments.map(x => getTripleProp(x, false)),
-          pos: _node.start
-        });
-        return wrap();
-      } else {
-        callJsGlobalFunction(_node);
-        return wrap();
-      }
+      handleUniversalCallExp(_node);
+      return wrap();
     }
 
     if (
@@ -604,6 +594,20 @@ function ast2asc(ast, js) {
     }
 
     return [LITERAL_TYPES[_node.type], _node.value, _node.start];
+  }
+
+  function handleUniversalCallExp(_node) {
+    if (varSet.has(_node.callee.name)) {
+      ans.push({
+        op: 'call',
+        fun: _node.callee.name,
+        args: _node.arguments.map(x => getTripleProp(x, false)),
+        pos: _node.start
+      });
+    }
+    else {
+      callJsGlobalFunction(_node);
+    }
   }
 
   function assert(cond, msg) {
@@ -769,7 +773,11 @@ function ast2asc(ast, js) {
           let callExp = _node;
           const allArr = [];
           while (callExp && callExp.type === "CallExpression") {
-            assert(callExp.arguments.length === 1);
+            if (callExp.arguments.length !== 1) {
+              isConcat = false;
+              break;
+            }
+
             allArr.push(callExp.arguments[0].name);
             if (callExp.callee.property.name !== "concat") {
               isConcat = false;
@@ -795,16 +803,17 @@ function ast2asc(ast, js) {
               containers: allArr.reverse(),
               pos: _node.start
             });
+            break;
           } else if (isSliceOne) {
             ans.push({
               op: "subscript",
               container: _node.callee.object.name,
               value: ["ctnr", "rest"]
             });
-          } else {
-            // TODO:
-            notImpErr(_node);
-          }
+            break;
+          } 
+
+          handleUniversalCallExp(_node);
         } else {
           notImpErr(_node);
         }
@@ -834,14 +843,24 @@ function ast2asc(ast, js) {
         } else if (_node.left.type.endsWith("Expression")) {
           if (
             _node.left.object.type === "Identifier" &&
-            _node.left.property.type === "BinaryExpression" &&
-            _node.left.property.operator === "-" &&
-            _node.left.property.right.value === 1
+              (_node.left.property.type === "BinaryExpression" &&
+                _node.left.property.operator === "-" &&
+                _node.left.property.right.value === 1)
           ) {
-            lhssubs = getTripleProp(_node.left.property.left, true);
+            lhssubs = getTripleProp(_node.left.property.left, false);
             ans.push({
               op: "reassign",
               lhssubs,
+              lhs: ["iden", _node.left.object.name],
+              rhs: getTripleProp(_node.right, true)
+            });
+          } else if (
+            _node.left.object.type === 'Identifier' &&
+            _node.left.property.type === "StringLiteral"
+          ) {
+            ans.push({
+              op: "reassign",
+              lhssubs: ['lit', `"${_node.left.property.value}"`],
               lhs: ["iden", _node.left.object.name],
               rhs: getTripleProp(_node.right, true)
             });
@@ -851,7 +870,7 @@ function ast2asc(ast, js) {
           ) {
             ans.push({
               op: "reassign",
-              lhssubs: ['num', _node.left.property.value + 1],
+              lhssubs: ["num", _node.left.property.value + 1],
               lhs: ["iden", _node.left.object.name],
               rhs: getTripleProp(_node.right, true)
             });
