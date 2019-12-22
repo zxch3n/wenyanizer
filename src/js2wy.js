@@ -3,6 +3,7 @@ const { asc2wy } = require("./asc2wy");
 const { getRandomChineseName } = require('./utils');
 
 // TODO: refactor!!
+// TODO: find a way to make sure registerNewName is invoked after "name" op or "var" op
 
 function js2wy(jsStr) {
   const asc = js2asc(jsStr);
@@ -119,12 +120,16 @@ function mapType(type, value) {
     return DECLARATION_TYPES[type];
   }
 
-  if (type === "ArrowFunctionExpression") {
+  if (type === "ArrowFunctionExpression" || type === 'FunctionExpression') {
     return "fun";
   }
 
   if (type === "ArrayExpression") {
     return "arr";
+  }
+
+  if (type === 'ObjectExpression') {
+    return 'obj';
   }
 
   if (value instanceof Array) {
@@ -292,15 +297,22 @@ function ast2asc(ast, js) {
   tmpVars = [];
   varIndex = 0;
   allVars = [];
-  varSet = new Set();
+  varSet = new Map();
   const namesOnlyUsedOnce = getNamesOnlyUsedOnce(ast.program.body);
   const nodes = ast.program.body;
   const ans = [];
   var node;
-  const varTypeMap = new Map();
 
   function throwError(msg = "") {
     throw new Error(msg + JSON.stringify(node.loc.start));
+  }
+
+  function registerNewName(name, type) {
+    if (!varSet.has(name)) {
+      allVars.push(name);
+    }
+
+    varSet.set(name, type);
   }
 
   function saveStagedToNewVar() {
@@ -309,6 +321,9 @@ function ast2asc(ast, js) {
       op: "name",
       names: [newName]
     });
+
+    // FIXME: get the type
+    registerNewName(name, 'obj');
     return newName;
   }
 
@@ -404,6 +419,8 @@ function ast2asc(ast, js) {
         op: "name",
         names: [name]
       });
+
+      registerNewName(name, 'obj');
       return ["iden", name, _node.start];
     }
 
@@ -516,8 +533,6 @@ function ast2asc(ast, js) {
   }
 
   function addFunction(funcNode) {
-    allVars.push(funcNode.id.name);
-    varSet.add(funcNode.id.name);
     ans.push({
       op: "fun",
       arity: funcNode.params.length,
@@ -531,6 +546,10 @@ function ast2asc(ast, js) {
       }),
       pos: funcNode.start
     });
+    if (funcNode.id) {
+      // Skip Anonymous Function
+      registerNewName(funcNode.id.name, 'fun');
+    }
     ans.push({
       op: "funbody",
       pos: funcNode.start
@@ -561,6 +580,10 @@ function ast2asc(ast, js) {
       type: type,
       count: tripleRep.length
     });
+
+    for (const name of names) {
+      registerNewName(name, type);
+    }
   }
 
   function addIfTestExpression(_node) {
@@ -789,16 +812,16 @@ function ast2asc(ast, js) {
     for (let i = 0; i < _node.declarations.length; i++) {
       const declarator = _node.declarations[i];
       const name = declarator.id.name;
-      varSet.add(name);
       if (declarator.init == null) {
         ans.push({
-          op,
+          op: "var",
           type: defaultType,
           count: 1,
           values: [],
           names: [name]
         });
         names.push(name);
+        registerNewName(name, 'obj')
       } else if (
         declarator.init.type === "BinaryExpression" ||
         declarator.init.type === "CallExpression" ||
@@ -820,8 +843,8 @@ function ast2asc(ast, js) {
             op: "name",
             names: [name]
           });
-          allVars.push(name);
-          varSet.add(name);
+
+          registerNewName(name, 'num');
         }
         names.push(name);
       } else {
@@ -829,14 +852,39 @@ function ast2asc(ast, js) {
         const dtype = mapType(declarator.init.type || typeof value, value);
         appendDeclaration(dtype, value, name);
         names.push(name);
-        if (dtype === "fun" && declarator.init.body.extra.raw !== "0") {
-          // TODO:
-          notImpErr(_node);
-          addFunction();
+        if (dtype === "fun") {
+          if (
+            declarator.init.body.extra &&
+            declarator.init.body.extra.raw === "0"
+          ) {
+          } else if (
+            declarator.init.type === "ArrowFunctionExpression" ||
+            declarator.init.type === "FunctionExpression"
+          ) {
+            addFunction(declarator.init);
+          } else {
+            notImpErr(declarator);
+          }
+        }
+
+        if (dtype === 'obj' && declarator.init.properties.length) {
+          // TODO: use new Syntax
+          for (const property of declarator.init.properties) {
+            ans.push({
+              op: 'reassign',
+              lhs: ['iden', name],
+              lhssubs: ['lit', `"${property.key.name || property.key.value}"`],
+              rhs: getTripleProp(property.value)
+            });
+          }
         }
 
         if (dtype === "arr" && declarator.init.elements.length) {
-          notImpErr(_node);
+          ans.push({
+            op: 'push',
+            container: name,
+            values: declarator.init.elements.map(getTripleProp)
+          })
         }
       }
     }
@@ -859,15 +907,14 @@ function ast2asc(ast, js) {
       names: [name]
     });
 
-    allVars.push(name);
-    varTypeMap.set(name, type);
+    registerNewName(name, type);
   }
 
   function preprocessTypeValueBeforeDeclare(dtype, value) {
     let type = dtype;
     let toIgnoreValues = type === "fun" || type === "arr" || type === "obj";
     if (type === "iden") {
-      type = varTypeMap.get(value) || "obj";
+      type = varSet.get(value) || "obj";
       // Try to compress
       const name = value;
       if (namesOnlyUsedOnce.has(name)) {
@@ -1101,12 +1148,20 @@ function ast2asc(ast, js) {
               value: ["lit", `"${_node.property.name}"`]
             });
           } else if (_node.property.value != null) {
-            ans.push({
-              op: "subscript",
-              container: object.name,
-              // FIXME: should I plus 1 or not??
-              value: ["num", _node.property.value + 1]
-            })
+            if (_node.property.type === "StringLiteral") {
+              ans.push({
+                op: "subscript",
+                container: object.name,
+                value: ["lit", `"${_node.property.value}"`]
+              });
+            } else {
+              ans.push({
+                op: "subscript",
+                container: object.name,
+                // FIXME: should I plus 1 or not??
+                value: ["num", _node.property.value + 1]
+              });
+            }
           } else {
             notImpErr(_node);
           }
@@ -1123,6 +1178,8 @@ function ast2asc(ast, js) {
           values: [],
           names: [name]
         });
+
+        registerNewName(name, 'arr');
         ans.push({
           op: 'push',
           container: name,
@@ -1162,6 +1219,8 @@ function ast2asc(ast, js) {
           names: [_node.id.name],
           values: []
         });
+
+        registerNewName(_node.id.name, 'fun');
         addFunction(_node);
         break;
       case "EmptyStatement":
