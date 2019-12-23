@@ -1,0 +1,12 @@
+.github/
+.vscode/
+examples/
+node_modules/
+src/
+test/
+.gitignore
+.npmignore
+README.md
+webpack.config.js
+.mocharc.json
+yarn.lock
