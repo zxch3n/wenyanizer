@@ -1,7 +1,17 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
-const { getRandomChineseName, LAMBDA } = require('./utils');
-GLOBAL_OBJECTS = ['String', 'document', 'global', 'window', 'Math', 'Object', 'Array', 'Number', '']
+const { getRandomChineseName, LAMBDA } = require("./utils");
+GLOBAL_OBJECTS = [
+  "String",
+  "document",
+  "global",
+  "window",
+  "Math",
+  "Object",
+  "Array",
+  "Number",
+  ""
+];
 
 // TODO: refactor!!
 // TODO: find a way to make sure registerNewName is invoked after "name" op or "var" op
@@ -49,7 +59,11 @@ function ascPostProcess(asc) {
 
   function findIgnorableIden(op) {
     for (const key in op) {
-      if (op[key] && op[key][0] === "iden" && namesOnlyUsedOnce.has(op[key][1])) {
+      if (
+        op[key] &&
+        op[key][0] === "iden" &&
+        namesOnlyUsedOnce.has(op[key][1])
+      ) {
         return op[key][1];
       }
     }
@@ -121,7 +135,7 @@ function mapType(type, value) {
     return DECLARATION_TYPES[type];
   }
 
-  if (type === "ArrowFunctionExpression" || type === 'FunctionExpression') {
+  if (type === "ArrowFunctionExpression" || type === "FunctionExpression") {
     return "fun";
   }
 
@@ -129,8 +143,8 @@ function mapType(type, value) {
     return "arr";
   }
 
-  if (type === 'ObjectExpression') {
-    return 'obj';
+  if (type === "ObjectExpression") {
+    return "obj";
   }
 
   if (value instanceof Array) {
@@ -151,7 +165,7 @@ const LITERALS = {
   StringLiteral: "str"
 };
 
-const COMPARE_OPERATORS = ["!=", "==", ">=", "<=", "<", ">", '===', '!=='];
+const COMPARE_OPERATORS = ["!=", "==", ">=", "<=", "<", ">", "===", "!=="];
 const OPERATORS = [
   "!=",
   "==",
@@ -224,7 +238,7 @@ function getNamesOnlyUsedOnce(body) {
 }
 
 function isReassigned(name, node) {
-  if (!node || typeof node !== 'object') {
+  if (!node || typeof node !== "object") {
     return false;
   }
 
@@ -236,10 +250,7 @@ function isReassigned(name, node) {
     return true;
   }
 
-  if (
-    node.type === 'UpdateExpression' &&
-    node.argument.name === name
-  ) {
+  if (node.type === "UpdateExpression" && node.argument.name === name) {
     return true;
   }
 
@@ -294,6 +305,12 @@ function isIteratingFromZeroToN(_node) {
   return true;
 }
 
+/**
+ * Convert JS AST to Wenyan Lang ASC
+ *
+ * @param {Ast} ast
+ * @param {string} js
+ */
 function ast2asc(ast, js) {
   tmpVars = [];
   varIndex = 0;
@@ -303,10 +320,159 @@ function ast2asc(ast, js) {
   const namesOnlyUsedOnce = getNamesOnlyUsedOnce(ast.program.body);
   const nodes = ast.program.body;
   const ans = [];
-  var node;
+  for (var node of nodes) {
+    process(node);
+  }
 
-  function throwError(msg = "") {
-    throw new Error(msg + JSON.stringify(node.loc.start));
+  return ans;
+
+  function process(_node) {
+    switch (_node.type) {
+      case "VariableDeclaration":
+        handleDeclaration(_node);
+        break;
+      case "ExpressionStatement":
+        handleExpressionStatement(_node.expression);
+        break;
+      case "UpdateExpression":
+      case "CallExpression":
+        handleExpressionStatement(_node);
+        break;
+      case "WhileStatement":
+        if (_node.test.type === "BooleanLiteral") {
+          if (_node.test.value === true) {
+            ans.push({
+              op: "whiletrue"
+            });
+          }
+        } else {
+          notImpErr(_node);
+        }
+
+        for (const subNode of _node.body.body) {
+          process(subNode);
+        }
+
+        ans.push({
+          op: "end"
+        });
+        break;
+      case "IfStatement":
+        addIfTestExpression(_node);
+
+        for (const subNode of _node.consequent.body) {
+          process(subNode);
+        }
+
+        if (_node.alternate) {
+          ans.push({
+            op: "else"
+          });
+          for (const subNode of _node.alternate.body) {
+            process(subNode);
+          }
+        }
+
+        ans.push({
+          op: "end"
+        });
+        break;
+      case "BreakStatement":
+        ans.push({
+          op: "break"
+        });
+        break;
+      case "LogicalExpression":
+      case "BinaryExpression":
+        if (isSimpleForm(_node)) {
+          // TODO: remove name hotfix maybe
+          ans.push({
+            lhs: getTripleProp(_node.left, false),
+            rhs: getTripleProp(_node.right, true),
+            op: "op" + _node.operator,
+            name: _node._name
+          });
+        } else {
+          notImpErr(_node);
+        }
+        break;
+      case "ObjectExpression":
+        assert(_node._name != null);
+        addVarOp([_node._name], [], 'obj');
+        initObjectProperties(_node._name, _node.properties);
+        break;
+      case "ReturnStatement":
+        const v = {
+          op: "return",
+          value: getTripleProp(_node.argument, false),
+          pos: _node.start
+        };
+        if (v.value == null) {
+          delete v.value;
+        }
+        ans.push(v);
+        break;
+      case "ForStatement":
+        // TODO: Currently it only supports `for (let i = 0; i < n; i++)`,
+        // or `for (const a of b)`
+        handleForStatement(_node);
+        break;
+      case "ForOfStatement":
+        assert(_node.right.type === "Identifier");
+        ans.push({
+          op: "for",
+          container: _node.right.name,
+          iterator: getTripleProp(_node.left, false)[1]
+        });
+
+        for (const subNode of _node.body.body) {
+          process(subNode);
+        }
+
+        ans.push({
+          op: "end"
+        });
+        break;
+      case "MemberExpression":
+        handleMemberExpression(_node);
+        break;
+      case "ArrayExpression":
+        const name = _node._name || getNextTmpName();
+        addVarOp([name], [], 'arr');
+        ans.push({
+          op: "push",
+          container: name,
+          values: _node.elements.map((x) => getTripleProp(x, false))
+        });
+
+        if (_node._name == null) {
+          // Stage this variable
+          addVarOp([], [['iden', name]], 'arr');
+        }
+        break;
+      case "UnaryExpression":
+        ans.push({
+          op: "not",
+          value: getTripleProp(_node.argument, true),
+          pos: _node.start
+        });
+        break;
+      case "LogicalExpression":
+        ans.push({
+          op: "op" + _node.operator,
+          lhs: getTripleProp(_node.left),
+          rhs: getTripleProp(_node.right, true)
+        });
+        break;
+      case "FunctionDeclaration":
+        addVarOp([_node.id.name], [], 'fun');
+        addFunction(_node);
+        break;
+      case "EmptyStatement":
+        break;
+      default:
+        notImpErr(_node);
+    }
   }
 
   function registerNewName(name, type) {
@@ -317,15 +483,35 @@ function ast2asc(ast, js) {
     varSet.set(name, type);
   }
 
-  function saveStagedToNewVar() {
-    const newName = getNextTmpName();
+  function addNameOp(names) {
     ans.push({
       op: "name",
-      names: [newName]
+      names: names
     });
 
-    // FIXME: get the type
-    registerNewName(newName, 'obj');
+    for (const name of names) {
+      registerNewName(name, "obj");
+    }
+  }
+
+  function addVarOp(names, values, type) {
+    const count = Math.max(names.length, values.length);
+    ans.push({
+      op: "var",
+      count,
+      names,
+      values,
+      type
+    });
+
+    for (const name of names) {
+      registerNewName(name, type);
+    }
+  }
+
+  function saveStagedToNewVar() {
+    const newName = getNextTmpName();
+    addNameOp([newName]);
     return newName;
   }
 
@@ -401,14 +587,14 @@ function ast2asc(ast, js) {
   }
 
   /**
-   * This function is used to wrap the global object 
+   * This function is used to wrap the global object
    * which has not been supported by wenyan.
-   * 
+   *
    * 1. It will create necessary function
    * 2. Invoke the function
    * 3. Return the output of it
-   * 
-   * @param {*} _node 
+   *
+   * @param {*} _node
    */
   function callJsGlobalFunction(_node) {
     assert(_node.type === "CallExpression");
@@ -424,15 +610,15 @@ function ast2asc(ast, js) {
       } else if (target.type === "CallExpression") {
         _getSignature(target.callee);
         assert(target.arguments.length <= LAMBDA.length);
-        signature += '(';
+        signature += "(";
         for (let i = 0; i < target.arguments.length; i++) {
           // Chinese char may introduce error
           // const name = "子" + LAMBDA[i];
           const name = "_a" + i;
           signature += `${name},`;
-          args.push(name)
+          args.push(name);
         }
-        signature += ')';
+        signature += ")";
       } else {
         notImpErr();
       }
@@ -446,42 +632,34 @@ function ast2asc(ast, js) {
       funcName = getNextTmpName();
       signatureCache[signature] = funcName;
       // TODO: refactor, extract all func together
-      ans.push({
-        op: "var",
-        count: 1,
-        type: "fun",
-        names: [funcName],
-        values: []
-      });
-
+      addVarOp([funcName], [], "fun");
       ans.push({
         op: "fun",
         arity: _node.arguments.length,
         args: _node.arguments.map((x, index) => {
-          return {type: 'obj', name: args[index]};
+          return { type: "obj", name: args[index] };
         }),
         pos: _node.start
       });
-      
-      registerNewName(funcName, "fun");
+
       ans.push({
-        op: "funbody",
+        op: "funbody"
       });
       ans.push({
         op: "return",
-        value: ['data', signature]
-      })
+        value: ["data", signature]
+      });
       ans.push({
-        op: "funend",
+        op: "funend"
       });
     }
 
     ans.push({
-      op: 'call',
+      op: "call",
       fun: funcName,
-      args: _node.arguments.map(x => getTripleProp(x, false)),
+      args: _node.arguments.map((x) => getTripleProp(x, false)),
       pos: _node.start
-    })
+    });
   }
 
   /**
@@ -497,16 +675,11 @@ function ast2asc(ast, js) {
 
     function wrap() {
       if (canUseStaged) {
-        return ['ans', null];
+        return ["ans", null];
       }
 
       const name = getNextTmpName();
-      ans.push({
-        op: "name",
-        names: [name]
-      });
-
-      registerNewName(name, 'obj');
+      addNameOp([name]);
       return ["iden", name, _node.start];
     }
 
@@ -515,22 +688,19 @@ function ast2asc(ast, js) {
       return wrap();
     }
 
-    if (
-      _node.type === "MemberExpression" ||
-      _node.type === "CallExpression"
-    ) {
+    if (_node.type === "MemberExpression" || _node.type === "CallExpression") {
       process(_node);
       return wrap();
     }
 
-    if ( _node.type === "ArrayExpression") {
-        _node._name = getNextTmpName();
-        process(_node);
-        return ["iden", _node._name, _node.start];
+    if (_node.type === "ArrayExpression") {
+      _node._name = getNextTmpName();
+      process(_node);
+      return ["iden", _node._name, _node.start];
     }
 
     if (_node.type === "VariableDeclaration") {
-      const names = declare(_node);
+      const names = handleDeclaration(_node);
       assert(names.length === 1);
       return ["iden", names[0], _node.start];
     }
@@ -538,10 +708,13 @@ function ast2asc(ast, js) {
     if (
       _node.type === "BinaryExpression" ||
       _node.type === "LogicalExpression" ||
-      _node.type === 'ObjectExpression'
+      _node.type === "ObjectExpression"
     ) {
       // TODO: remove this hotfix in the future version
-      if (_node.type === "ObjectExpression" || COMPARE_OPERATORS.includes(_node.operator)) {
+      if (
+        _node.type === "ObjectExpression" ||
+        COMPARE_OPERATORS.includes(_node.operator)
+      ) {
         _node._name = getNextTmpName();
         process(_node);
         return ["iden", _node._name, _node.start];
@@ -563,9 +736,9 @@ function ast2asc(ast, js) {
         });
 
         return wrap();
-      } else if (_node.operator === '!') {
+      } else if (_node.operator === "!") {
         ans.push({
-          op: 'not',
+          op: "not",
           value: getTripleProp(_node.argument, true),
           pos: _node.start
         });
@@ -601,25 +774,30 @@ function ast2asc(ast, js) {
   function handleUniversalCallExp(_node) {
     if (varSet.has(_node.callee.name)) {
       ans.push({
-        op: 'call',
+        op: "call",
         fun: _node.callee.name,
-        args: _node.arguments.map(x => getTripleProp(x, false)),
+        args: _node.arguments.map((x) => getTripleProp(x, false)),
         pos: _node.start
       });
-    }
-    else {
+    } else {
       callJsGlobalFunction(_node);
     }
   }
 
   function assert(cond, msg) {
-    cond || throwError(msg);
+    if (!cond) {
+      throw new Error(msg + JSON.stringify(node.loc.start));
+    }
   }
 
-  function notImpErr(_node = node) {
+  function notImpErr(_node = node, msg = "") {
     const errorSnippet = js.slice(_node.start, _node.end);
     console.log(errorSnippet);
-    throw new Error(`NotImplementedError, in ${_node.loc.start}`);
+    throw new Error(`NotImplementedError: line ${_node.loc.start.line}, col ${_node.loc.start.column};
+    \t"${errorSnippet}"
+    \t${msg}
+    The grammar is not supported yet.
+    `);
   }
 
   function addFunction(funcNode) {
@@ -638,7 +816,7 @@ function ast2asc(ast, js) {
     });
     if (funcNode.id) {
       // Skip Anonymous Function
-      registerNewName(funcNode.id.name, 'fun');
+      registerNewName(funcNode.id.name, "fun");
     }
     ans.push({
       op: "funbody",
@@ -654,7 +832,7 @@ function ast2asc(ast, js) {
   }
 
   function createTempVarToWrap(values, type = undefined, names = []) {
-    const tripleRep = values.map(x => getTripleProp(x, false));
+    const tripleRep = values.map((x) => getTripleProp(x, false));
     ({ type } = preprocessTypeValueBeforeDeclare(
       type || tripleRep[0][0],
       values[0]
@@ -663,17 +841,8 @@ function ast2asc(ast, js) {
       // FIXME:
       type = "obj";
     }
-    ans.push({
-      op: "var",
-      values: tripleRep,
-      names: names,
-      type: type,
-      count: tripleRep.length
-    });
 
-    for (const name of names) {
-      registerNewName(name, type);
-    }
+    addVarOp(names, tripleRep, type);
   }
 
   function addIfTestExpression(_node) {
@@ -705,7 +874,7 @@ function ast2asc(ast, js) {
     } else if (
       _node.test.type === "LogicalExpression" ||
       _node.test.type === "BinaryExpression" ||
-      _node.test.type === 'UnaryExpression'
+      _node.test.type === "UnaryExpression"
     ) {
       ans.push({
         op: "if",
@@ -717,216 +886,214 @@ function ast2asc(ast, js) {
     }
   }
 
-  function addExpressionStatement(_node) {
+  function handleExpressionStatement(_node) {
     switch (_node.type) {
       case "CallExpression":
-        if (_node.callee.type === "Identifier") {
-          ans.push({
-            op: "call",
-            fun: _node.callee.name,
-            args: _node.arguments.map(x => getTripleProp(x, false)),
-            pos: _node.start
-          });
-        } else if (_node.callee.object.name === "console") {
-          let isShinkable = true;
-          const n = _node.arguments.length;
-          for (let j = 0; j < n; j++) {
-            const name = _node.arguments[j].name;
-            if (
-              name !== allVars[allVars.length - n + j] ||
-              !namesOnlyUsedOnce.has(name) ||
-              ans[ans.length - n + j].names[0] !== name
-            ) {
-              isShinkable = false;
-              break;
-            }
-          }
-          if (isShinkable) {
-            // Remove the declaration target
-            for (let j = 0; j < n; j++) {
-              if (ans[ans.length - n + j].op === "var") {
-                ans[ans.length - n + j].names = [];
-              } else if (ans[ans.length - n + j].op === "name") {
-                ans.splice(ans.length - n + j, 1);
-              }
-            }
-          } else {
-            createTempVarToWrap(_node.arguments);
-          }
-
-          ans.push({
-            op: "print"
-          });
-        } else if (
-          _node.callee.type === "MemberExpression" &&
-          _node.callee.property.name === "push"
-        ) {
-          assert(_node.callee.object.type === "Identifier");
-          ans.push({
-            op: "push",
-            container: _node.callee.object.name,
-            pos: _node.callee.object.start,
-            values: _node.arguments.map(x => getTripleProp(x, false))
-          });
-        } else if (_node.callee.type.endsWith("MemberExpression")) {
-          // Concat
-          let isConcat = true;
-          let isSliceOne = false;
-          let callExp = _node;
-          const allArr = [];
-          while (callExp && callExp.type === "CallExpression") {
-            if (callExp.arguments.length !== 1) {
-              isConcat = false;
-              break;
-            }
-
-            allArr.push(callExp.arguments[0].name);
-            if (callExp.callee.property.name !== "concat") {
-              isConcat = false;
-              break;
-            }
-
-            callExp = callExp.callee.object;
-          }
-
-          if (
-            _node.callee.property.name === "slice" &&
-            _node.arguments.length === 1 &&
-            _node.arguments[0].value === 1 &&
-            _node.callee.object.type === "Identifier"
-          ) {
-            isSliceOne = true;
-          }
-
-          if (isConcat) {
-            allArr.push(callExp.name);
-            ans.push({
-              op: "cat",
-              containers: allArr.reverse(),
-              pos: _node.start
-            });
-            break;
-          } else if (isSliceOne) {
-            ans.push({
-              op: "subscript",
-              container: _node.callee.object.name,
-              value: ["ctnr", "rest"]
-            });
-            break;
-          } 
-
-          handleUniversalCallExp(_node);
-        } else {
-          notImpErr(_node);
-        }
+        handleCallExpression(_node);
         break;
       case "ExpressionStatement":
         process(_node.expression);
         break;
       case "AssignmentExpression":
-        assert(_node.operator === "=");
-        if (_node.left.type === "Identifier") {
-          if (_node.right.type === "FunctionExpression") {
-            {
-              // Assert we have initialized the function
-              const last = ans[ans.length - 1];
-              if (last.op !== "var" || last.names[0] !== _node.left.name) {
-                notImpErr(_node);
-              }
-            }
-            addFunction(_node.right);
-          } else {
-            ans.push({
-              op: "reassign",
-              lhs: ["iden", _node.left.name],
-              rhs: getTripleProp(_node.right, true)
-            });
-          }
-        } else if (_node.left.type.endsWith("Expression")) {
-          if (
-            _node.left.object.type === "Identifier" &&
-              (_node.left.property.type === "BinaryExpression" &&
-                _node.left.property.operator === "-" &&
-                _node.left.property.right.value === 1)
-          ) {
-            lhssubs = getTripleProp(_node.left.property.left, false);
-            ans.push({
-              op: "reassign",
-              lhssubs,
-              lhs: ["iden", _node.left.object.name],
-              rhs: getTripleProp(_node.right, true)
-            });
-          } else if (
-            _node.left.object.type === 'Identifier' &&
-            _node.left.property.type === "StringLiteral"
-          ) {
-            ans.push({
-              op: "reassign",
-              lhssubs: ['lit', `"${_node.left.property.value}"`],
-              lhs: ["iden", _node.left.object.name],
-              rhs: getTripleProp(_node.right, true)
-            });
-          } else if (
-            _node.left.object.type === "Identifier" &&
-            _node.left.property.type === "NumericLiteral"
-          ) {
-            ans.push({
-              op: "reassign",
-              lhssubs: ["num", _node.left.property.value + 1],
-              lhs: ["iden", _node.left.object.name],
-              rhs: getTripleProp(_node.right, true)
-            });
-          } else {
-            notImpErr(_node);
-          }
-        } else {
-          notImpErr(_node);
-        }
+        handleAssignmentExpression(_node);
         break;
       case "UpdateExpression":
-        if (_node.operator === '++') {
-          ans.push({
-            op: 'op+',
-            lhs: ['iden', _node.argument.name],
-            rhs: ['num', 1, _node.start]
-          });
-
-        } else if (_node.operator === '--') {
-          ans.push({
-            op: 'op-',
-            lhs: ['iden', _node.argument.name],
-            rhs: ['num', 1, _node.start]
-          });
-        } else {
-          notImpErr(_node);
-        }
-
-        ans.push({
-          op:  'reassign',
-          lhs: ['iden', _node.argument.name],
-          rhs: ['ans', null]
-        })
+        handleUpdateExpression(_node);
         break;
       default:
-        throwError(`Unknown expression ${_node.expression.type}`);
+        notImpErr(_node, `Unknown expression ${_node.expression.type}`);
     }
   }
 
-  function declare(_node, defaultType = "num") {
+  function handleUpdateExpression(_node) {
+    if (_node.operator === "++") {
+      ans.push({
+        op: "op+",
+        lhs: ["iden", _node.argument.name],
+        rhs: ["num", 1, _node.start]
+      });
+    } else if (_node.operator === "--") {
+      ans.push({
+        op: "op-",
+        lhs: ["iden", _node.argument.name],
+        rhs: ["num", 1, _node.start]
+      });
+    } else {
+      notImpErr(_node);
+    }
+    ans.push({
+      op: "reassign",
+      lhs: ["iden", _node.argument.name],
+      rhs: ["ans", null]
+    });
+  }
+
+  function handleCallExpression(_node) {
+    if (_node.callee.type === "Identifier") {
+      ans.push({
+        op: "call",
+        fun: _node.callee.name,
+        args: _node.arguments.map((x) => getTripleProp(x, false)),
+        pos: _node.start
+      });
+    } else if (_node.callee.object.name === "console") {
+      let isShinkable = true;
+      const n = _node.arguments.length;
+      for (let j = 0; j < n; j++) {
+        const name = _node.arguments[j].name;
+        if (
+          name !== allVars[allVars.length - n + j] ||
+          !namesOnlyUsedOnce.has(name) ||
+          ans[ans.length - n + j].names[0] !== name
+        ) {
+          isShinkable = false;
+          break;
+        }
+      }
+      if (isShinkable) {
+        // Remove the declaration target
+        for (let j = 0; j < n; j++) {
+          if (ans[ans.length - n + j].op === "var") {
+            ans[ans.length - n + j].names = [];
+          } else if (ans[ans.length - n + j].op === "name") {
+            ans.splice(ans.length - n + j, 1);
+          }
+        }
+      } else {
+        createTempVarToWrap(_node.arguments);
+      }
+      ans.push({
+        op: "print"
+      });
+    } else if (
+      _node.callee.type === "MemberExpression" &&
+      _node.callee.property.name === "push"
+    ) {
+      assert(_node.callee.object.type === "Identifier");
+      ans.push({
+        op: "push",
+        container: _node.callee.object.name,
+        pos: _node.callee.object.start,
+        values: _node.arguments.map((x) => getTripleProp(x, false))
+      });
+    } else if (_node.callee.type.endsWith("MemberExpression")) {
+      // Concat
+      let isConcat = true;
+      let isSliceOne = false;
+      let callExp = _node;
+      const allArr = [];
+      while (callExp && callExp.type === "CallExpression") {
+        if (callExp.arguments.length !== 1) {
+          isConcat = false;
+          break;
+        }
+        allArr.push(callExp.arguments[0].name);
+        if (callExp.callee.property.name !== "concat") {
+          isConcat = false;
+          break;
+        }
+        callExp = callExp.callee.object;
+      }
+      if (
+        _node.callee.property.name === "slice" &&
+        _node.arguments.length === 1 &&
+        _node.arguments[0].value === 1 &&
+        _node.callee.object.type === "Identifier"
+      ) {
+        isSliceOne = true;
+      }
+      if (isConcat) {
+        allArr.push(callExp.name);
+        ans.push({
+          op: "cat",
+          containers: allArr.reverse(),
+          pos: _node.start
+        });
+        return;
+      } else if (isSliceOne) {
+        ans.push({
+          op: "subscript",
+          container: _node.callee.object.name,
+          value: ["ctnr", "rest"]
+        });
+        return;
+      }
+
+      handleUniversalCallExp(_node);
+    } else {
+      notImpErr(_node);
+    }
+  }
+
+  function handleAssignmentExpression(_node) {
+    assert(_node.operator === "=");
+    if (_node.left.type === "Identifier") {
+      if (_node.right.type === "FunctionExpression") {
+        {
+          // Assert we have initialized the function
+          const last = ans[ans.length - 1];
+          if (last.op !== "var" || last.names[0] !== _node.left.name) {
+            notImpErr(_node);
+          }
+        }
+        addFunction(_node.right);
+      } else {
+        ans.push({
+          op: "reassign",
+          lhs: ["iden", _node.left.name],
+          rhs: getTripleProp(_node.right, true)
+        });
+      }
+    } else if (_node.left.type.endsWith("Expression")) {
+      if (
+        _node.left.object.type === "Identifier" &&
+        _node.left.property.type === "BinaryExpression" &&
+          _node.left.property.operator === "-" &&
+          _node.left.property.right.value === 1
+      ) {
+        lhssubs = getTripleProp(_node.left.property.left, false);
+        ans.push({
+          op: "reassign",
+          lhssubs,
+          lhs: ["iden", _node.left.object.name],
+          rhs: getTripleProp(_node.right, true)
+        });
+      } else if (
+        _node.left.object.type === "Identifier" &&
+        _node.left.property.type === "StringLiteral"
+      ) {
+        ans.push({
+          op: "reassign",
+          lhssubs: ["lit", `"${_node.left.property.value}"`],
+          lhs: ["iden", _node.left.object.name],
+          rhs: getTripleProp(_node.right, true)
+        });
+      } else if (
+        _node.left.object.type === "Identifier" &&
+        _node.left.property.type === "NumericLiteral"
+      ) {
+        ans.push({
+          op: "reassign",
+          lhssubs: ["num", _node.left.property.value + 1],
+          lhs: ["iden", _node.left.object.name],
+          rhs: getTripleProp(_node.right, true)
+        });
+      } else {
+        notImpErr(_node);
+      }
+    } else {
+      notImpErr(_node);
+    }
+  }
+
+  function handleDeclaration(_node, defaultType = "num") {
     const names = [];
     for (let i = 0; i < _node.declarations.length; i++) {
       const declarator = _node.declarations[i];
       const name = declarator.id.name;
       if (declarator.init == null) {
-        ans.push({
-          op: "var",
-          type: defaultType,
-          count: 1,
-          values: [],
-          names: [name]
-        });
+        addVarOp([name], [], "obj");
         names.push(name);
-        registerNewName(name, 'obj')
       } else if (
         declarator.init.type === "BinaryExpression" ||
         declarator.init.type === "CallExpression" ||
@@ -944,12 +1111,7 @@ function ast2asc(ast, js) {
             rhs: ["ans", null]
           });
         } else {
-          ans.push({
-            op: "name",
-            names: [name]
-          });
-
-          registerNewName(name, 'num');
+          addNameOp([name]);
         }
         names.push(name);
       } else {
@@ -972,17 +1134,17 @@ function ast2asc(ast, js) {
           }
         }
 
-        if (dtype === 'obj' && declarator.init.properties.length) {
+        if (dtype === "obj" && declarator.init.properties.length) {
           // TODO: use new Syntax
           initObjectProperties(name, declarator.init.properties);
         }
 
         if (dtype === "arr" && declarator.init.elements.length) {
           ans.push({
-            op: 'push',
+            op: "push",
             container: name,
-            values: declarator.init.elements.map(x => getTripleProp(x, false))
-          })
+            values: declarator.init.elements.map((x) => getTripleProp(x, false))
+          });
         }
       }
     }
@@ -993,9 +1155,9 @@ function ast2asc(ast, js) {
   function initObjectProperties(name, properties) {
     for (const property of properties) {
       ans.push({
-        op: 'reassign',
-        lhs: ['iden', name],
-        lhssubs: ['lit', `"${property.key.name || property.key.value}"`],
+        op: "reassign",
+        lhs: ["iden", name],
+        lhssubs: ["lit", `"${property.key.name || property.key.value}"`],
         rhs: getTripleProp(property.value, true)
       });
     }
@@ -1008,15 +1170,7 @@ function ast2asc(ast, js) {
       dtype,
       value
     ));
-    ans.push({
-      op: "var",
-      type,
-      count: 1,
-      values: toIgnoreValues ? [] : [[dtype, value]],
-      names: [name]
-    });
-
-    registerNewName(name, type);
+    addVarOp([name], toIgnoreValues ? [] : [[dtype, value]], type);
   }
 
   function preprocessTypeValueBeforeDeclare(dtype, value) {
@@ -1044,321 +1198,132 @@ function ast2asc(ast, js) {
     return { type, toIgnoreValues, value };
   }
 
-  function process(_node) {
-    switch (_node.type) {
-      case "VariableDeclaration":
-        declare(_node);
-        break;
-      case "ExpressionStatement":
-        addExpressionStatement(_node.expression);
-        break;
-      case "UpdateExpression":
-        addExpressionStatement(_node);
-        break;
-      case "CallExpression":
-        addExpressionStatement(_node);
-        break;
-      case "WhileStatement":
-        if (_node.test.type === "BooleanLiteral") {
-          if (_node.test.value === true) {
-            ans.push({
-              op: "whiletrue"
-            });
-          }
-        } else {
-          notImpErr(_node);
-        }
-
-        for (const subNode of _node.body.body) {
-          process(subNode);
-        }
-
+  function handleMemberExpression(_node) {
+    let object = _node.object;
+    if (
+      _node.object.type === "CallExpression" ||
+      object.type === "MemberExpression"
+    ) {
+      process(_node.object);
+      const newVar = saveStagedToNewVar();
+      object = {
+        name: newVar,
+        type: "Identifier"
+      };
+    }
+    if (object.type !== "Identifier") {
+      notImpErr(_node);
+    }
+    if (_node.property.type === "BinaryExpression") {
+      if (_node.property.operator === "-" && _node.property.right.value === 1) {
         ans.push({
-          op: "end"
+          op: "subscript",
+          container: object.name,
+          value: getTripleProp(_node.property.left, true)
         });
-        break;
-      case "IfStatement":
-        addIfTestExpression(_node);
-
-        for (const subNode of _node.consequent.body) {
-          process(subNode);
-        }
-
-        if (_node.alternate) {
+      } else {
+        process(_node.property);
+        ans.push({
+          op: "subscript",
+          container: object.name,
+          value: ["ans", null]
+        });
+      }
+    } else if (_node.property.type in LITERAL_TYPES) {
+      if (_node.property.name === "length") {
+        ans.push({
+          op: "length",
+          container: object.name
+        });
+      } else if (_node.property.name != null) {
+        ans.push({
+          op: "subscript",
+          container: object.name,
+          value: ["lit", `"${_node.property.name}"`]
+        });
+      } else if (_node.property.value != null) {
+        if (_node.property.type === "StringLiteral") {
           ans.push({
-            op: "else"
-          });
-          for (const subNode of _node.alternate.body) {
-            process(subNode);
-          }
-        }
-
-        ans.push({
-          op: "end"
-        });
-        break;
-      case "BreakStatement":
-        ans.push({
-          op: "break"
-        });
-        break;
-      case "LogicalExpression":
-      case "BinaryExpression":
-        if (isSimpleForm(_node)) {
-          // TODO: remove name hotfix maybe
-          ans.push({
-            lhs: getTripleProp(_node.left, false),
-            rhs: getTripleProp(_node.right, true),
-            op: "op" + _node.operator,
-            name: _node._name
+            op: "subscript",
+            container: object.name,
+            value: ["lit", `"${_node.property.value}"`]
           });
         } else {
-          notImpErr(_node);
-        }
-        break;
-      case "ObjectExpression":
-        assert (_node._name != null)
-        ans.push({
-          op: 'var',
-          count: 1,
-          type: 'obj',
-          names: [_node._name],
-          values: []
-        });
-        initObjectProperties(_node._name, _node.properties);
-        break;
-      case "ReturnStatement":
-        const v = {
-          op: "return",
-          value: getTripleProp(_node.argument, false),
-          pos: _node.start
-        };
-        if (v.value == null) {
-          delete v.value;
-        }
-        ans.push(v);
-        break;
-      case "ForStatement":
-        // TODO: Currently it only supports `for (let i = 0; i < n; i++)`,
-        // or `for (const a of b)`
-        const initName = _node.init.declarations[0].id.name;
-        let shouldAddManualBreak =
-          !_node.init ||
-          !_node.init.declarations.length ||
-          _node.init.declarations[0].init.value !== 0 ||
-          !_node.update ||
-          _node.update.operator !== "++" ||
-          _node.update.argument.name !== initName ||
-          (_node.test &&
-            (_node.test.left.name !== initName ||
-              _node.test.operator !== "<" ||
-              !(_node.test.right.type in LITERAL_TYPES))) ||
-          isReassigned(initName, _node.body);
-        const shouldInit = shouldAddManualBreak || (
-          _node.init &&
-          _node.init.declarations &&
-          _node.init.declarations[0] &&
-          !_node.init.declarations[0].id.name.startsWith("_rand"));
-
-        if (shouldInit) {
-          appendDeclaration('num', _node.init.declarations[0].init.value, initName);
-        }
-
-        if (shouldAddManualBreak) {
           ans.push({
-            op: 'whiletrue'
-          })
-        } else if (isIteratingFromZeroToN(_node)) {
-          ans.push({
-            op: "whilen",
-            value: getTripleProp(_node.test.right),
-            pos: _node.start
-          });
-        } else {
-          notImpErr(_node);
-        }
-
-        for (const subNode of _node.body.body) {
-          process(subNode);
-        }
-
-        if (_node.test && shouldAddManualBreak) {
-          ans.push({
-            op: 'if',
-            test: [
-              getTripleProp(_node.test),
-              ['cmp', '=='],
-              ['bool', false]
-            ]
-          });
-
-          ans.push({
-            op: 'break'
-          });
-
-          ans.push({
-            op: 'end'
+            op: "subscript",
+            container: object.name,
+            // FIXME: should I plus 1 or not??
+            value: ["num", _node.property.value + 1]
           });
         }
-
-        if (shouldInit) {
-          // Update
-          process(_node.update);
-        }
-
-        ans.push({
-          op: "end"
-        });
-        break;
-      case "ForOfStatement":
-        assert(_node.right.type === "Identifier");
-        ans.push({
-          op: "for",
-          container: _node.right.name,
-          iterator: getTripleProp(_node.left, false)[1]
-        });
-
-        for (const subNode of _node.body.body) {
-          process(subNode);
-        }
-
-        ans.push({
-          op: "end"
-        });
-        break;
-      case "MemberExpression":
-        let object = _node.object;
-        if (_node.object.type === "CallExpression" || object.type === 'MemberExpression') {
-          process(_node.object);
-          const newVar = saveStagedToNewVar();
-          object = {
-            name: newVar,
-            type: "Identifier"
-          };
-        }
-
-        if (object.type !== "Identifier") {
-          notImpErr(_node);
-        }
-
-        if (_node.property.type === "BinaryExpression") {
-          if (
-            _node.property.operator === "-" &&
-            _node.property.right.value === 1
-          ) {
-            ans.push({
-              op: "subscript",
-              container: object.name,
-              value: getTripleProp(_node.property.left, true)
-            });
-          } else {
-            process(_node.property);
-            ans.push({
-              op: "subscript",
-              container: object.name,
-              value: ["ans", null]
-            });
-          }
-        } else if (_node.property.type in LITERAL_TYPES) {
-          if (_node.property.name === "length") {
-            ans.push({
-              op: "length",
-              container: object.name
-            });
-          } else if (_node.property.name != null) {
-            ans.push({
-              op: "subscript",
-              container: object.name,
-              value: ["lit", `"${_node.property.name}"`]
-            });
-          } else if (_node.property.value != null) {
-            if (_node.property.type === "StringLiteral") {
-              ans.push({
-                op: "subscript",
-                container: object.name,
-                value: ["lit", `"${_node.property.value}"`]
-              });
-            } else {
-              ans.push({
-                op: "subscript",
-                container: object.name,
-                // FIXME: should I plus 1 or not??
-                value: ["num", _node.property.value + 1]
-              });
-            }
-          } else {
-            notImpErr(_node);
-          }
-        } else {
-          notImpErr(_node);
-        }
-        break;
-      case "ArrayExpression":
-        const name = _node._name || getNextTmpName();
-        ans.push({
-          op: "var",
-          type: 'arr',
-          count: 1,
-          values: [],
-          names: [name]
-        });
-
-        registerNewName(name, 'arr');
-        ans.push({
-          op: 'push',
-          container: name,
-          values: _node.elements.map(x => getTripleProp(x, false))
-        });
-
-        if (_node._name == null) {
-          // Stage this variable
-          ans.push({
-            op: "var",
-            type: "arr",
-            count: 1,
-            values: [name],
-            names: []
-          });
-        }
-        break;
-      case "UnaryExpression":
-        ans.push({
-          op: "not",
-          value: getTripleProp(_node.argument, true),
-          pos: _node.start
-        });
-        break;
-      case "LogicalExpression":
-        ans.push({
-          op: "op" + _node.operator,
-          lhs: getTripleProp(_node.left),
-          rhs: getTripleProp(_node.right, true)
-        });
-        break;
-      case "FunctionDeclaration":
-        ans.push({
-          op: "var",
-          count: 1,
-          type: "fun",
-          names: [_node.id.name],
-          values: []
-        });
-
-        registerNewName(_node.id.name, 'fun');
-        addFunction(_node);
-        break;
-      case "EmptyStatement":
-        break;
-      default:
+      } else {
         notImpErr(_node);
+      }
+    } else {
+      notImpErr(_node);
     }
   }
 
-  for (node of nodes) {
-    process(node);
+  function handleForStatement(_node) {
+    const initName = _node.init.declarations[0].id.name;
+    // whether it is in the format of `for (let i = 0; i < n; i++)`
+    let shouldAddManualBreak =
+      !_node.init ||
+      !_node.init.declarations.length ||
+      _node.init.declarations[0].init.value !== 0 ||
+      !_node.update ||
+      _node.update.operator !== "++" ||
+      _node.update.argument.name !== initName ||
+      (_node.test &&
+        (_node.test.left.name !== initName ||
+          _node.test.operator !== "<" ||
+          !(_node.test.right.type in LITERAL_TYPES))) ||
+      isReassigned(initName, _node.body);
+    const shouldInit =
+      shouldAddManualBreak ||
+      (_node.init &&
+        _node.init.declarations &&
+        _node.init.declarations[0] &&
+        !_node.init.declarations[0].id.name.startsWith("_rand"));
+    if (shouldInit) {
+      appendDeclaration("num", _node.init.declarations[0].init.value, initName);
+    }
+    if (shouldAddManualBreak) {
+      ans.push({
+        op: "whiletrue"
+      });
+    } else if (isIteratingFromZeroToN(_node)) {
+      ans.push({
+        op: "whilen",
+        value: getTripleProp(_node.test.right),
+        pos: _node.start
+      });
+    } else {
+      notImpErr(_node);
+    }
+    for (const subNode of _node.body.body) {
+      process(subNode);
+    }
+    if (_node.test && shouldAddManualBreak) {
+      ans.push({
+        op: "if",
+        test: [getTripleProp(_node.test), ["cmp", "=="], ["bool", false]]
+      });
+      ans.push({
+        op: "break"
+      });
+      ans.push({
+        op: "end"
+      });
+    }
+    if (shouldInit) {
+      // Update
+      process(_node.update);
+    }
+    ans.push({
+      op: "end"
+    });
   }
-
-  return ans;
 }
 
 module.exports.js2wy = js2wy;
