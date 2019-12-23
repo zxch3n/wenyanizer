@@ -1,0 +1,14 @@
+body {
+  padding: 16px 8px;
+  min-width: 300px;
+  margin: 0px;
+}
+
+#root {
+  margin: 0 auto;
+  min-height: calc(100vh - 48px);
+  max-width: 1200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
