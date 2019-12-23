@@ -3,6 +3,9 @@
 <p align="center">
 
 <img src="https://github.com/zxch3n/wenyanizer/workflows/Node%20CI/badge.svg"/>
+<a href="https://codecov.io/gh/zxch3n/wenyanizer">
+  <img src="https://codecov.io/gh/zxch3n/wenyanizer/branch/master/graph/badge.svg" />
+</a>
 
 </p>
 
