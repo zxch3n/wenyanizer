@@ -1,6 +1,6 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "51a350e0c9c415f1ca432d09aca2ea83",
+    "revision": "eb0a8c02dcb79acd7e2539d359133815",
     "url": "/wenyanizer/index.html"
   },
   {
