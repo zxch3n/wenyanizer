@@ -25,6 +25,13 @@ function wenyanize(js){
 是謂「文言轉換」之術也。
 /]:#()
 
+# [Play Online](http://zxch3n.github.io/wenyanizer)
+
+
+<p align="center">
+  <a href="http://zxch3n.github.io/wenyanizer"><img src="https://i.postimg.cc/QC4ymZ1z/image.png"/></a>
+</p>
+
 # Roadmap
 
 | Name | Status |

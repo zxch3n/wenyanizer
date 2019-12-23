@@ -6,3 +6,4 @@ build/wenyan-macos
 build/wenyan-win.exe
 test/log
 dist/
+.npmrc
