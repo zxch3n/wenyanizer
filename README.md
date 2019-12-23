@@ -40,6 +40,6 @@ function wenyanize(js){
 | Wenyan Lib | ❌ |
 | switch | ❌ |
 | `this` keyword | ❌ |
-| require | ❌ |
+| require (CMD) | ❌ |
 | export | ❌ |
 | es6 ^ | ❌ |

@@ -1,17 +1,26 @@
 {
   "name": "wenyanizer",
   "version": "0.0.1",
+  "main": "dist/index.js",
+  "typings": "./index.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/zxch3n/wenyanizer"
   },
+  "files": [
+    "dist/index.js",
+    "index.d.ts"
+  ],
   "scripts": {
     "test": "mocha",
     "build": "webpack"
   },
   "license": "MIT",
   "devDependencies": {
-    "mocha": "^6.2.2"
+    "mocha": "^6.2.2",
+    "webpack": "^4.41.4",
+    "webpack-cli": "^3.3.10",
+    "webpack-node-externals": "^1.7.2"
   },
   "dependencies": {
     "@babel/parser": "^7.7.7"
