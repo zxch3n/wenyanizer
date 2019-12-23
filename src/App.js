@@ -9,20 +9,27 @@ import useMediaQuery from "@material-ui/core/useMediaQuery";
 import Paper from "@material-ui/core/Paper";
 import Grid from "@material-ui/core/Grid";
 import CssBaseline from "@material-ui/core/CssBaseline";
-import { debounce } from 'lodash';
-import { js2wy } from './js2wy';
-import './App.css';
+import { debounce } from "lodash";
+import { js2wy } from "./js2wy";
+import "./App.css";
 
 const useStyles = makeStyles((theme) => ({
   root: {
     flexGrow: 1,
-    margin: '0 auto',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center'
+    margin: "0 auto",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "column"
+  },
+  title: {
+    margin: "32px 0",
+    textAlign: "center"
   },
   paper: {
-    padding: theme.spacing(2),
+    paddingLeft: theme.spacing(4),
+    paddingRight: theme.spacing(4),
+    boxShadow: "0 6px 16px 12px rgba(10, 10, 16, 0.2)"
   }
 }));
 
@@ -54,36 +61,63 @@ export default function AutoGrid() {
     [prefersDarkMode]
   );
   const classes = useStyles();
-  const onJsChanged = React.useCallback(debounce((js)=>{
-    try{
-      setWy(js2wy(js))
-    } catch(e) {
-      setWy(e.toString());
-    }
-  }, 1000), [])
-  const onChange = React.useCallback(debounce((v)=>{
-    setJs(v);
-    onJsChanged(v);
-  }, 50), []);
+  const onJsChanged = React.useCallback(
+    debounce((js) => {
+      try {
+        setWy(js2wy(js));
+      } catch (e) {
+        setWy(e.toString());
+      }
+    }, 1000),
+    []
+  );
+  const onChange = React.useCallback(
+    debounce((v) => {
+      setJs(v);
+      onJsChanged(v);
+    }, 50),
+    []
+  );
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <div className={classes.root}>
-        <Grid container spacing={2} style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center'
-        }}>
-          <Grid item xs={12} md={6} style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            <Editor onChange={onChange} value={js}/>
+        <div className={classes.title}>
+          <h1>文言转换 <a href="https://github.com/zxch3n/wenyanizer">Wenyanizer</a></h1>
+          <p>
+            JavaScript →{" "}
+            <a href="https://github.com/LingDong-/wenyan-lang">Wenyan Lang</a>
+          </p>
+        </div>
+        <Grid
+          container
+          spacing={2}
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center"
+          }}
+        >
+          <Grid
+            item
+            xs={12}
+            md={6}
+            spacing={2}
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center"
+            }}
+          >
+            <Editor onChange={onChange} value={js} />
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Paper className={classes.paper}>{wy}</Paper>
+          <Grid item xs={12} md={6} spacing={2}>
+            <Paper className={classes.paper}>
+              <pre>
+                <code>{wy}</code>
+              </pre>
+            </Paper>
           </Grid>
         </Grid>
       </div>

@@ -14,6 +14,11 @@ export const Component = (props) => {
       className="editor"
       name="JavaScript"
       editorProps={{ $blockScrolling: true }}
+      style={{
+        borderRadius: 8,
+        boxShadow: '0 6px 24px 4px rgba(10, 10, 14, 0.3)',
+        padding: 6
+      }}
     />
   );
 };
