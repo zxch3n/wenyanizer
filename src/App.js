@@ -22,6 +22,10 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "column"
   },
+  a: {
+    color: 'white',
+    textDecorationColor: 'white'
+  },
   title: {
     margin: "32px 0",
     textAlign: "center"
@@ -36,7 +40,6 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 export default function AutoGrid() {
-  const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
   const [js, setJs] = React.useState(`function wenyanizer(js){
     var ast = parse(js);
     var asc = ast2asc(ast);
@@ -55,10 +58,10 @@ export default function AutoGrid() {
     () =>
       createMuiTheme({
         palette: {
-          type: prefersDarkMode ? "dark" : "light"
+          type: "dark"
         }
       }),
-    [prefersDarkMode]
+    []
   );
   const classes = useStyles();
   const onJsChanged = React.useCallback(
@@ -84,10 +87,10 @@ export default function AutoGrid() {
       <CssBaseline />
       <div className={classes.root}>
         <div className={classes.title}>
-          <h1>文言转换 <a href="https://github.com/zxch3n/wenyanizer">Wenyanizer</a></h1>
+          <h1>文言转换 <a className={classes.a} href="https://github.com/zxch3n/wenyanizer">Wenyanizer</a></h1>
           <p>
             JavaScript →{" "}
-            <a href="https://github.com/LingDong-/wenyan-lang">Wenyan Lang</a>
+            <a className={classes.a} href="https://github.com/LingDong-/wenyan-lang">Wenyan Lang</a>
           </p>
         </div>
         <Grid
