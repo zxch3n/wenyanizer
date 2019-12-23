@@ -23,3 +23,10 @@ jobs:
         yarn test
       env:
         CI: true
+    - name: Codecov
+      uses: codecov/codecov-action@v1.0.5
+      with:
+        # User defined upload name. Visible in Codecov UI
+        name: wenyanizer
+        # Repository upload token - get it from codecov.io
+        token: ${{ secrets.CODE_COV }}
