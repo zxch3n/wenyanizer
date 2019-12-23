@@ -1,6 +1,12 @@
 <h1 align="center"> 文言轉換器 Wenyanizer </h1>
 
 <p align="center">
+
+<img src="https://github.com/zxch3n/wenyanizer/workflows/Node%20CI/badge.svg"/>
+
+</p>
+
+<p align="center">
   <img width="400px" src="https://i.postimg.cc/SRkkVjKx/code.png"/>
   <img width="400px" src="https://i.postimg.cc/WzDfdfj6/image.png"/>
 </p>

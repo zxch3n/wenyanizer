@@ -7,3 +7,6 @@ build/wenyan-win.exe
 test/log
 dist/
 .npmrc
+.nyc_output/
+yarn-error.log
+coverage/

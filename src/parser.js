@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 try {
   var fs = require("fs");
   var { hanzi2num, num2hanzi } = require("./hanzi2num");

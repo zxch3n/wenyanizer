@@ -1,7 +1,9 @@
 {
   "name": "wenyanizer",
   "description": "你的代碼就像一首詩 Parse JavaScript Code to Wenyan Lang",
-  "keywords": ["wenyan"],
+  "keywords": [
+    "wenyan"
+  ],
   "version": "0.0.1",
   "main": "dist/index.js",
   "typings": "./index.d.ts",
@@ -18,17 +20,21 @@
     "index.d.ts"
   ],
   "scripts": {
-    "test": "mocha",
+    "test": "nyc --reporter=lcov mocha",
     "build": "webpack"
   },
   "license": "MIT",
   "devDependencies": {
     "mocha": "^6.2.2",
+    "nyc": "^15.0.0",
     "webpack": "^4.41.4",
     "webpack-cli": "^3.3.10",
     "webpack-node-externals": "^1.7.2"
   },
   "dependencies": {
     "@babel/parser": "^7.7.7"
+  },
+  "nyc": {
+    "include": "src"
   }
 }
