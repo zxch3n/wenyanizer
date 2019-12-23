@@ -52,10 +52,11 @@ function wenyanize(js){
 | Array      | ✔    |
 | Wraping global object when necessary, such as `Math`, `JSON`  | ✔    |
 | `console.log` | ✔  |
+| `a.b = 3` | WIP |
+| Wenyan Lib | WIP |
 | `a[b] = 3` | ❌ |
-| Wenyan Lib | ❌ |
 | switch | ❌ |
 | `this` keyword | ❌ |
-| require (CMD) | ❌ |
+| require (CommonJS) | ❌ |
 | export | ❌ |
 | es6 ^ | ❌ |
