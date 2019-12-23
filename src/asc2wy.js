@@ -231,7 +231,7 @@ function asc2wy(asc) {
       case "op<":
       case "op>=":
       case "op<=":
-        // TODO: make this shorter
+        // TODO: make this shorter when new Wenyan syntax is available
         if (node.name == null) {
           throw new Error();
         }

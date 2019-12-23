@@ -14,7 +14,6 @@ GLOBAL_OBJECTS = [
 ];
 
 // TODO: refactor!!
-// TODO: find a way to make sure registerNewName is invoked after "name" op or "var" op
 
 function js2wy(jsStr) {
   const asc = js2asc(jsStr);
@@ -808,7 +807,6 @@ function ast2asc(ast, js) {
         const props = getTripleProp(x);
         return {
           name: props[1],
-          // TODO: get type
           type: "obj"
         };
       }),
@@ -838,8 +836,8 @@ function ast2asc(ast, js) {
       values[0]
     ));
     if (type === "iden") {
-      // FIXME:
-      type = "obj";
+      type = varSet.get(values[0]);
+      assert(type != null)
     }
 
     addVarOp(names, tripleRep, type);
@@ -867,7 +865,6 @@ function ast2asc(ast, js) {
     } else if (_node.test.type in LITERAL_TYPES) {
       ans.push({
         op: "if",
-        // TODO: it seems we cannot use "ans" in if
         test: [getTripleProp(_node.test, false)],
         pos: _node.start
       });
@@ -1135,7 +1132,7 @@ function ast2asc(ast, js) {
         }
 
         if (dtype === "obj" && declarator.init.properties.length) {
-          // TODO: use new Syntax
+          // TODO: use new Syntax when object initialization is available
           initObjectProperties(name, declarator.init.properties);
         }
 
@@ -1249,14 +1246,17 @@ function ast2asc(ast, js) {
             value: ["lit", `"${_node.property.value}"`]
           });
         } else {
+          assert(_node.property.type === 'NumericLiteral')
           ans.push({
             op: "subscript",
             container: object.name,
-            // FIXME: should I plus 1 or not??
             value: ["num", _node.property.value + 1]
           });
         }
       } else {
+        // TODO: add this part when wenyan has type assertion
+        // 1. if target is string, target[index]
+        // 2. if target is number, target[index + 1]
         notImpErr(_node);
       }
     } else {
