@@ -27,6 +27,8 @@ const useStyles = makeStyles((theme) => ({
     textAlign: "center"
   },
   paper: {
+    paddingTop: theme.spacing(2),
+    paddingBottom: theme.spacing(2),
     paddingLeft: theme.spacing(4),
     paddingRight: theme.spacing(4),
     boxShadow: "0 6px 16px 12px rgba(10, 10, 16, 0.2)"
@@ -41,16 +43,14 @@ export default function AutoGrid() {
   	var wy = asc2wy(asc);
   	return wy;
 }`);
-  const [wy, setWy] = React.useState(`
-吾有一術。名之曰「文言轉換」
+  const [wy, setWy] = React.useState(`吾有一術。名之曰「文言轉換」
 欲行是術。必先得一物。曰「覺誒斯」。
 乃行是術曰。
     施「語法分析」於「覺誒斯」。名之曰「抽象語法樹」。
     施「樹鏈轉換」於「抽象語法樹」。名之曰「抽象語法鏈」。
     施「定稿」於「抽象語法鏈」。名之曰「文言」。
     乃得「文言」
-是謂「文言轉換」之術也。
-  `);
+是謂「文言轉換」之術也。`);
   const theme = React.useMemo(
     () =>
       createMuiTheme({
