@@ -381,7 +381,7 @@ function ast2asc(ast, js) {
       case "LogicalExpression":
       case "BinaryExpression":
         if (isSimpleForm(_node)) {
-          // TODO: remove name hotfix maybe
+          // TODO: remove name hotfix when op== op<= is supported officially
           ans.push({
             lhs: getTripleProp(_node.left, false),
             rhs: getTripleProp(_node.right, true),
@@ -1036,12 +1036,17 @@ function ast2asc(ast, js) {
         });
       }
     } else if (_node.left.type.endsWith("Expression")) {
+      // If left hand side is an expression
+      if (_node.left.object.type !== "Identifier") {
+        notImpErr(_node);
+      }
+
       if (
-        _node.left.object.type === "Identifier" &&
         _node.left.property.type === "BinaryExpression" &&
         _node.left.property.operator === "-" &&
         _node.left.property.right.value === 1
       ) {
+        // Cases such as: a[b - 1], a[9 - 1]
         const lhssubs = getTripleProp(_node.left.property.left, false);
         ans.push({
           op: "reassign",
@@ -1049,24 +1054,26 @@ function ast2asc(ast, js) {
           lhs: ["iden", _node.left.object.name],
           rhs: getTripleProp(_node.right, true)
         });
-      } else if (
-        _node.left.object.type === "Identifier" &&
-        _node.left.property.type === "StringLiteral"
-      ) {
+      } else if (_node.left.property.type === "StringLiteral") {
+        // a['123']
         ans.push({
           op: "reassign",
           lhssubs: ["lit", `"${_node.left.property.value}"`],
           lhs: ["iden", _node.left.object.name],
           rhs: getTripleProp(_node.right, true)
         });
-      } else if (
-        _node.left.object.type === "Identifier" &&
-        _node.left.property.type === "NumericLiteral"
-      ) {
+      } else if (_node.left.property.type === "NumericLiteral") {
         ans.push({
           op: "reassign",
           lhssubs: ["num", _node.left.property.value + 1],
           lhs: ["iden", _node.left.object.name],
+          rhs: getTripleProp(_node.right, true)
+        });
+      } else if (js[_node.left.object.end] === ".") {
+        ans.push({
+          op: "reassign",
+          lhs: ["iden", _node.left.object.name],
+          lhssubs: ["lit", `"${_node.left.property.name}"`],
           rhs: getTripleProp(_node.right, true)
         });
       } else {
