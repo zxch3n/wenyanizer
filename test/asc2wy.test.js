@@ -47,7 +47,6 @@ describe("ASC => Wenyan", () => {
   var files = fs.readdirSync(path.join(__dirname, "../examples/"));
   for (var i = 0; i < files.length; i++) {
     const name = files[i].split(".")[0];
-    if (name != 'quine') continue;
     it(`should convert ASC back to Wenyan for example [${name}]`, () => {
       runExample(name);
     });
