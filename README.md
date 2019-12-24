@@ -34,6 +34,30 @@ function wenyanize(js){
 是謂「文言轉換」之術也。
 /]:#()
 
+# Usage
+
+Install wenyanizer. Run
+
+```
+yarn add wenyanizer
+```
+
+Import and use it in your project
+
+```javascript
+import {js2wy} from 'wenyanizer';
+
+// Or use it in node.js
+// const {js2wy} = require('wenyanizer');
+
+js2wy("while(true){console.log('学习')}")
+
+// Output: '恆為是。\n    吾有一言。曰「「学习」」。\n    書之。\n云云。\n'
+
+```
+
+
+
 # [Play Online](http://zxch3n.github.io/wenyanizer)
 
 
