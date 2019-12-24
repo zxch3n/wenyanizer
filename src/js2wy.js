@@ -719,7 +719,7 @@ function ast2asc(ast, js) {
       addVarOp([NEW_FUNC_NAME], [], "fun");
       ans.push({
         op: "fun",
-        arity: _node.arguments.length + 1,
+        arity: 1,
         args: [{ type: "obj", name: "蓝图" }],
         pos: _node.start
       });
