@@ -1,10 +1,10 @@
 {
   "name": "wenyanizer",
-  "description": "你的代碼就像一首詩 Parse JavaScript Code to Wenyan Lang",
+  "description": "代碼如詩 Parse JavaScript Code to Wenyan Lang",
   "keywords": [
     "wenyan"
   ],
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "dist/index.js",
   "typings": "./index.d.ts",
   "author": {
