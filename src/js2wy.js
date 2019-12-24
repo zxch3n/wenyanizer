@@ -729,7 +729,7 @@ function ast2asc(ast, js) {
       });
       ans.push({
         op: "return",
-        value: ["data", "new 蓝图(...arguments)"]
+        value: ["data", "new 蓝图(...Array.prototype.slice.call(arguments, 1))"]
       });
       ans.push({
         op: "funend"
@@ -740,8 +740,7 @@ function ast2asc(ast, js) {
     ans.push({
       op: "call",
       fun: NEW_FUNC_NAME,
-      args: _node.arguments
-        .concat([_node.callee])
+      args: [_node.callee].concat(_node.arguments)
         .map((x) => getTripleProp(x, false)),
       pos: _node.start
     });

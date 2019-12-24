@@ -49,7 +49,7 @@ function runTestCase(file) {
 
     gt = run(jsText);
     gen = run(genJs);
-    assert.equal(gt, gen);
+    assert.equal(gen, gt);
   } catch (e) {
     throw e;
   }

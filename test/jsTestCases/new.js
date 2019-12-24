@@ -13,9 +13,9 @@ Constructor.prototype.yell = function(){
 const c = new Constructor();
 c.yell();
 
-function Child() {
+function Child(name) {
   Constructor.call(this);
-  this.a = 'a';
+  this.a = name;
   this.b = 'b'
 }
 
@@ -24,6 +24,6 @@ Child.prototype.laugh = function(){
   console.log('hahaha');
 }
 
-const child = new Child();
+const child = new Child('Jon');
 child.yell();
 child.laugh();
