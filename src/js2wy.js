@@ -12,7 +12,8 @@ const { getRandomChineseName, LAMBDA } = require("./utils");
 //   "Number",
 // ];
 
-// TODO: refactor!!
+// TODO: use wrapXxxExpression as the function name when one will push the output to the stack
+// TODO: use handleXxxExpression as the function name when one will NOT push things to the stack
 
 function js2wy(jsStr) {
   const asc = js2asc(jsStr);
@@ -183,6 +184,13 @@ function isSimpleForm(_node) {
   return OPERATORS.includes(_node.operator);
 }
 
+function tryTurnThisExpressionToIdentifier(_node) {
+  if (_node.type === "ThisExpression") {
+    _node.type = "Identifier";
+    _node.name = "this";
+  }
+}
+
 function getNamesOnlyUsedOnce(body) {
   const counter = {};
   function count(v) {
@@ -315,6 +323,8 @@ function ast2asc(ast, js) {
   const signatureCache = {};
   const namesOnlyUsedOnce = getNamesOnlyUsedOnce(ast.program.body);
   const nodes = ast.program.body;
+  const NEW_SIGNATURE = "JS_NEW()";
+  const NEW_FUNC_NAME = "造物";
   const ans = [];
   for (var node of nodes) {
     process(node);
@@ -380,17 +390,7 @@ function ast2asc(ast, js) {
         break;
       case "LogicalExpression":
       case "BinaryExpression":
-        if (isSimpleForm(_node)) {
-          // TODO: remove name hotfix when op== op<= is supported officially
-          ans.push({
-            lhs: getTripleProp(_node.left, false),
-            rhs: getTripleProp(_node.right, true),
-            op: "op" + _node.operator,
-            name: _node._name
-          });
-        } else {
-          notImpErr(_node);
-        }
+        wrapBinaryExpression(_node);
         break;
       case "ObjectExpression":
         assert(_node._name != null);
@@ -443,15 +443,44 @@ function ast2asc(ast, js) {
           pos: _node.start
         });
         break;
+      case "FunctionExpression": {
+        wrapFunctionExpression(_node);
+        break;
+      }
       case "FunctionDeclaration":
         addVarOp([_node.id.name], [], "fun");
         addFunction(_node);
+        break;
+      case "NewExpression":
+        wrapJsNewExpression(_node);
         break;
       case "EmptyStatement":
         break;
       default:
         notImpErr(_node);
     }
+  }
+
+  function wrapBinaryExpression(_node) {
+    if (isSimpleForm(_node)) {
+      // TODO: remove name hotfix when op== op<= is supported officially
+      ans.push({
+        lhs: getTripleProp(_node.left, false),
+        rhs: getTripleProp(_node.right, true),
+        op: "op" + _node.operator,
+        name: _node._name
+      });
+    } else {
+      notImpErr(_node);
+    }
+  }
+
+  function wrapFunctionExpression(_node) {
+    // Maybe there is a better way to wrap this in future
+    const name = getNextTmpName();
+    addVarOp([name], [], "fun");
+    addFunction(_node);
+    addVarOp([], [["iden", name]], "fun");
   }
 
   function handleArrayExpression(_node) {
@@ -487,8 +516,38 @@ function ast2asc(ast, js) {
     }
   }
 
+  function addReassignOp({ lhs, rhs, lhssubs = undefined }) {
+    if (lhs[0] === "iden") {
+      registerNewName(lhs[1]);
+    }
+
+    if (lhssubs) {
+      ans.push({
+        op: "reassign",
+        lhs,
+        rhs,
+        lhssubs
+      });
+    } else {
+      ans.push({
+        op: "reassign",
+        lhs,
+        rhs
+      });
+    }
+  }
+
   function addVarOp(names, values, type) {
     const count = Math.max(names.length, values.length);
+    for (let i = 0; i < count; i++) {
+      if (names[i]) {
+        assert(typeof names[i] === "string");
+      }
+      if (values[i]) {
+        assert(values[i] instanceof Array);
+        assert(values[i][0] == null || typeof values[i][0] === "string");
+      }
+    }
     ans.push({
       op: "var",
       count,
@@ -532,8 +591,7 @@ function ast2asc(ast, js) {
           getTripleProp(_node.property.left, false)
         ];
       } else {
-        console.log(_node);
-        throw new Error();
+        notImpErr(_node);
       }
     } else if (_node.type in LITERAL_TYPES) {
       return [getTripleProp(_node, false)];
@@ -543,7 +601,7 @@ function ast2asc(ast, js) {
     ) {
       return [getTripleProp(_node, false)];
     } else {
-      throw new Error();
+      notImpErr(_node);
     }
   }
 
@@ -655,6 +713,40 @@ function ast2asc(ast, js) {
     });
   }
 
+  function wrapJsNewExpression(_node) {
+    assertStrongly(_node.type === "NewExpression");
+    if (!(NEW_SIGNATURE in signatureCache)) {
+      addVarOp([NEW_FUNC_NAME], [], "fun");
+      ans.push({
+        op: "fun",
+        arity: _node.arguments.length + 1,
+        args: [{ type: "obj", name: "蓝图" }],
+        pos: _node.start
+      });
+
+      ans.push({
+        op: "funbody"
+      });
+      ans.push({
+        op: "return",
+        value: ["data", "new 蓝图(...arguments)"]
+      });
+      ans.push({
+        op: "funend"
+      });
+      signatureCache[NEW_SIGNATURE] = NEW_FUNC_NAME;
+    }
+
+    ans.push({
+      op: "call",
+      fun: NEW_FUNC_NAME,
+      args: _node.arguments
+        .concat([_node.callee])
+        .map((x) => getTripleProp(x, false)),
+      pos: _node.start
+    });
+  }
+
   /**
    * Get the triple tuple representation (used in Wenyan ASC) of a node
    *
@@ -701,7 +793,9 @@ function ast2asc(ast, js) {
     if (
       _node.type === "BinaryExpression" ||
       _node.type === "LogicalExpression" ||
-      _node.type === "ObjectExpression"
+      _node.type === "ObjectExpression" ||
+      _node.type === "FunctionExpression" ||
+      _node.type === "NewExpression"
     ) {
       // TODO: remove this hotfix in the future version
       if (
@@ -741,6 +835,7 @@ function ast2asc(ast, js) {
       }
     }
 
+    tryTurnThisExpressionToIdentifier(_node);
     if (!(_node.type in LITERAL_TYPES)) {
       notImpErr(_node);
     }
@@ -774,6 +869,20 @@ function ast2asc(ast, js) {
       });
     } else {
       callJsGlobalFunction(_node);
+    }
+  }
+
+  function assertStrongly(cond, _node, msg = "") {
+    if (!cond) {
+      const errorSnippet = js.slice(_node.start, _node.end);
+      console.log(errorSnippet);
+      throw new Error(`AssertError: line ${_node.loc.start.line}, col ${_node.loc.start.column};
+    \t"${errorSnippet}"
+    \t${msg}
+    This is weird 😣. If you see this message, it means the tests haven't cover this kinda cases. 
+    Please submit an issue to let me know!
+    https://github.com/zxch3n/wenyanizer
+    `);
     }
   }
 
@@ -912,8 +1021,7 @@ function ast2asc(ast, js) {
     } else {
       notImpErr(_node);
     }
-    ans.push({
-      op: "reassign",
+    addReassignOp({
       lhs: ["iden", _node.argument.name],
       rhs: ["ans", null]
     });
@@ -1017,7 +1125,7 @@ function ast2asc(ast, js) {
   }
 
   function handleAssignmentExpression(_node) {
-    assert(_node.operator === "=");
+    assertStrongly(_node.operator === "=", _node);
     if (_node.left.type === "Identifier") {
       if (_node.right.type === "FunctionExpression") {
         {
@@ -1029,56 +1137,69 @@ function ast2asc(ast, js) {
         }
         addFunction(_node.right);
       } else {
-        ans.push({
-          op: "reassign",
+        addReassignOp({
           lhs: ["iden", _node.left.name],
           rhs: getTripleProp(_node.right, true)
         });
       }
-    } else if (_node.left.type.endsWith("Expression")) {
-      // If left hand side is an expression
-      if (_node.left.object.type !== "Identifier") {
-        notImpErr(_node);
-      }
+    } else if (_node.left.type === "MemberExpression") {
+      handleAssignWithLhsMemberExpression(_node);
+    } else {
+      assertStrongly(
+        false,
+        _node,
+        "Assignment with left hand side of type that is nor Identifier nor MemberExpression"
+      );
+    }
+  }
 
-      if (
-        _node.left.property.type === "BinaryExpression" &&
-        _node.left.property.operator === "-" &&
-        _node.left.property.right.value === 1
-      ) {
-        // Cases such as: a[b - 1], a[9 - 1]
-        const lhssubs = getTripleProp(_node.left.property.left, false);
-        ans.push({
-          op: "reassign",
-          lhssubs,
-          lhs: ["iden", _node.left.object.name],
-          rhs: getTripleProp(_node.right, true)
-        });
-      } else if (_node.left.property.type === "StringLiteral") {
-        // a['123']
-        ans.push({
-          op: "reassign",
-          lhssubs: ["lit", `"${_node.left.property.value}"`],
-          lhs: ["iden", _node.left.object.name],
-          rhs: getTripleProp(_node.right, true)
-        });
-      } else if (_node.left.property.type === "NumericLiteral") {
-        ans.push({
-          op: "reassign",
-          lhssubs: ["num", _node.left.property.value + 1],
-          lhs: ["iden", _node.left.object.name],
-          rhs: getTripleProp(_node.right, true)
-        });
-      } else if (js[_node.left.object.end] === ".") {
-        ans.push({
-          op: "reassign",
-          lhs: ["iden", _node.left.object.name],
-          lhssubs: ["lit", `"${_node.left.property.name}"`],
-          rhs: getTripleProp(_node.right, true)
-        });
-      } else {
-        notImpErr(_node);
-      }
+  function handleAssignWithLhsMemberExpression(_node) {
+    let lhsName = undefined;
+    if (_node.left.object.type === "MemberExpression") {
+      // Cases like: `a['b']['c'] = 5`
+      process(_node.left.object);
+      lhsName = getNextTmpName();
+      addNamingOp([lhsName]);
+    }
+
+    tryTurnThisExpressionToIdentifier(_node.left.object);
+    if (_node.left.object.type !== "Identifier" && !lhsName) {
+      notImpErr(_node);
+    }
+
+    const lhs = lhsName ? ["iden", lhsName] : ["iden", _node.left.object.name];
+    if (
+      _node.left.property.type === "BinaryExpression" &&
+      _node.left.property.operator === "-" &&
+      _node.left.property.right.value === 1
+    ) {
+      // Cases such as: a[b - 1], a[9 - 1]
+      const lhssubs = getTripleProp(_node.left.property.left, false);
+      addReassignOp({
+        lhs,
+        lhssubs,
+        rhs: getTripleProp(_node.right, true)
+      });
+    } else if (_node.left.property.type === "StringLiteral") {
+      // Cases like: a['123']
+      addReassignOp({
+        lhs,
+        lhssubs: ["lit", `"${_node.left.property.value}"`],
+        rhs: getTripleProp(_node.right, true)
+      });
+    } else if (_node.left.property.type === "NumericLiteral") {
+      // Cases: a[0]
+      addReassignOp({
+        lhs,
+        lhssubs: ["num", _node.left.property.value + 1],
+        rhs: getTripleProp(_node.right, true)
+      });
+    } else if (js[_node.left.object.end] === ".") {
+      addReassignOp({
+        lhs,
+        lhssubs: ["lit", `"${_node.left.property.name}"`],
+        rhs: getTripleProp(_node.right, true)
+      });
     } else {
       notImpErr(_node);
     }
@@ -1092,6 +1213,9 @@ function ast2asc(ast, js) {
       if (declarator.init == null) {
         addVarOp([name], [], defaultType);
         names.push(name);
+      } else if (declarator.init.type === "NewExpression") {
+        wrapJsNewExpression(declarator.init);
+        addNamingOp([name]);
       } else if (
         declarator.init.type === "BinaryExpression" ||
         declarator.init.type === "CallExpression" ||
@@ -1104,8 +1228,7 @@ function ast2asc(ast, js) {
         if (COMPARE_OPERATORS.includes(declarator.init.operator)) {
           // FIXME: This is a ad-hoc fix for https://github.com/LingDong-/wenyan-lang/issues/317
         } else if (varSet.has(name)) {
-          ans.push({
-            op: "reassign",
+          addReassignOp({
             lhs: ["iden", name],
             rhs: ["ans", null]
           });
@@ -1155,8 +1278,7 @@ function ast2asc(ast, js) {
 
   function initObjectProperties(name, properties) {
     for (const property of properties) {
-      ans.push({
-        op: "reassign",
+      addReassignOp({
         lhs: ["iden", name],
         lhssubs: ["lit", `"${property.key.name || property.key.value}"`],
         rhs: getTripleProp(property.value, true)
@@ -1207,9 +1329,12 @@ function ast2asc(ast, js) {
         type: "Identifier"
       };
     }
+
+    tryTurnThisExpressionToIdentifier(object);
     if (object.type !== "Identifier") {
       notImpErr(_node);
     }
+
     if (_node.property.type === "BinaryExpression") {
       if (_node.property.operator === "-" && _node.property.right.value === 1) {
         ans.push({

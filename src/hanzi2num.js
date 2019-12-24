@@ -11,12 +11,12 @@ function hanzi2num(s){
     s = s.replace(/有/g,"")
 
     function _sp(s,units){
-        for (var i = 0; i < units.length; i++){
+        for (let i = 0; i < units.length; i++){
             var u = units[i]
             s = s.replace(u,":"+u+",")
         }
         var s2 = s.split(",")
-        for (var i = 0; i < s2.length; i++){
+        for (let i = 0; i < s2.length; i++){
             s2[i] = s2[i].split(":")
         }
         return s2;
@@ -140,9 +140,9 @@ function num2hanzi(n,nfrac=6){
         }
         var s = "";
         var z = -1;
-        for (var i = MULTS4.length-1; i>=0; i--){
-            var m = Math.pow(10000,i+1);
-            var k = Math.floor(n / m)
+        for (let i = MULTS4.length-1; i>=0; i--){
+            let m = Math.pow(10000,i+1);
+            let k = Math.floor(n / m)
             if (k>0){
                 n = n % m;
                 s+=int2hanzi(k)+MULTS4[i];
@@ -152,9 +152,9 @@ function num2hanzi(n,nfrac=6){
                 z = 1;
             }
         }
-        for (var i = MULTS1.length-1; i>=0; i--){
-            var m = Math.pow(10,i+1);
-            var k = Math.floor(n / m)
+        for (let i = MULTS1.length-1; i>=0; i--){
+            let m = Math.pow(10,i+1);
+            let k = Math.floor(n / m)
             if (k>0){
                 n = n % m;
                 s+=int2hanzi(k)+MULTS1[i];

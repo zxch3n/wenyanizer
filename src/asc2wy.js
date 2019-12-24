@@ -363,9 +363,9 @@ function asc2wy(asc) {
         addIndent();
         assert(node.lhs[0] === "iden");
         if (node.lhssubs) {
-          ans += `昔之「${node.lhs[1]}」之${getValue(node.lhssubs)}者。`;
+          ans += `昔之${getValue(node.lhs)}之${getValue(node.lhssubs)}者。`;
         } else {
-          ans += `昔之「${node.lhs[1]}」者。`;
+          ans += `昔之${getValue(node.lhs)}者。`;
         }
         ans += `今${getValue(node.rhs)}是矣。\n`;
         break;

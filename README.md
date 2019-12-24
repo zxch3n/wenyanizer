@@ -53,12 +53,13 @@ function wenyanize(js){
 | Wraping global object when necessary, such as `Math`, `JSON`  | ✔    |
 | `console.log` | ✔  |
 | `a.b = 3` | ✔ |
+| new | ✔ |
+| `this` keyword | ✔ |
 | [Wenyan Lib](https://github.com/LingDong-/wenyan-lang/issues/290) | WIP |
 | [Wenyan Nested Function Call](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
 | [Optimize Curried Function](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
 | `a[b] = 3` | ❌ |
 | switch | ❌ |
-| `this` keyword | ❌ |
 | require (CommonJS) | ❌ |
 | export | ❌ |
 | es6 ^ | ❌ |
