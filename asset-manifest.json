@@ -5,17 +5,17 @@
     "main.js.map": "/wenyanizer/static/js/main.77a027aa.chunk.js.map",
     "runtime-main.js": "/wenyanizer/static/js/runtime-main.7680ceea.js",
     "runtime-main.js.map": "/wenyanizer/static/js/runtime-main.7680ceea.js.map",
-    "static/js/2.cd9135d7.chunk.js": "/wenyanizer/static/js/2.cd9135d7.chunk.js",
-    "static/js/2.cd9135d7.chunk.js.map": "/wenyanizer/static/js/2.cd9135d7.chunk.js.map",
+    "static/js/2.94031999.chunk.js": "/wenyanizer/static/js/2.94031999.chunk.js",
+    "static/js/2.94031999.chunk.js.map": "/wenyanizer/static/js/2.94031999.chunk.js.map",
     "index.html": "/wenyanizer/index.html",
-    "precache-manifest.2c43cc5a363a67bc4711015a75c54f88.js": "/wenyanizer/precache-manifest.2c43cc5a363a67bc4711015a75c54f88.js",
+    "precache-manifest.5d742d1a28b679d8e0550d9097e93c67.js": "/wenyanizer/precache-manifest.5d742d1a28b679d8e0550d9097e93c67.js",
     "service-worker.js": "/wenyanizer/service-worker.js",
     "static/css/main.27fd15f6.chunk.css.map": "/wenyanizer/static/css/main.27fd15f6.chunk.css.map",
-    "static/js/2.cd9135d7.chunk.js.LICENSE": "/wenyanizer/static/js/2.cd9135d7.chunk.js.LICENSE"
+    "static/js/2.94031999.chunk.js.LICENSE": "/wenyanizer/static/js/2.94031999.chunk.js.LICENSE"
   },
   "entrypoints": [
     "static/js/runtime-main.7680ceea.js",
-    "static/js/2.cd9135d7.chunk.js",
+    "static/js/2.94031999.chunk.js",
     "static/css/main.27fd15f6.chunk.css",
     "static/js/main.77a027aa.chunk.js"
   ]
