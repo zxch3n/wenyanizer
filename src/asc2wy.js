@@ -166,10 +166,12 @@ function asc2wy(asc) {
 
     ans += `吾有${num2hanzi(n)}${type}。`;
     for (let i = 0; i < n; i++) {
-      if (node.values[i]) {
+      if (node.values[i] != null) {
         ans += `曰${getValue(node.values[i])}。`;
       } else if (node.type === "num" && n > 1) {
         ans += "曰零。";
+      } else if (node.type === 'str' && n > 1){
+        ans += "曰「「」」。";
       }
     }
     for (let i = 0; i < node.names.length; i++) {
