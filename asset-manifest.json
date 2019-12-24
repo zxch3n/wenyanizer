@@ -1,22 +1,22 @@
 {
   "files": {
     "main.css": "/wenyanizer/static/css/main.27fd15f6.chunk.css",
-    "main.js": "/wenyanizer/static/js/main.72f5c65c.chunk.js",
-    "main.js.map": "/wenyanizer/static/js/main.72f5c65c.chunk.js.map",
+    "main.js": "/wenyanizer/static/js/main.77a027aa.chunk.js",
+    "main.js.map": "/wenyanizer/static/js/main.77a027aa.chunk.js.map",
     "runtime-main.js": "/wenyanizer/static/js/runtime-main.7680ceea.js",
     "runtime-main.js.map": "/wenyanizer/static/js/runtime-main.7680ceea.js.map",
-    "static/js/2.393b5c89.chunk.js": "/wenyanizer/static/js/2.393b5c89.chunk.js",
-    "static/js/2.393b5c89.chunk.js.map": "/wenyanizer/static/js/2.393b5c89.chunk.js.map",
+    "static/js/2.cd9135d7.chunk.js": "/wenyanizer/static/js/2.cd9135d7.chunk.js",
+    "static/js/2.cd9135d7.chunk.js.map": "/wenyanizer/static/js/2.cd9135d7.chunk.js.map",
     "index.html": "/wenyanizer/index.html",
-    "precache-manifest.9ea7a9bf245ded5b8b5df83bebde10df.js": "/wenyanizer/precache-manifest.9ea7a9bf245ded5b8b5df83bebde10df.js",
+    "precache-manifest.2c43cc5a363a67bc4711015a75c54f88.js": "/wenyanizer/precache-manifest.2c43cc5a363a67bc4711015a75c54f88.js",
     "service-worker.js": "/wenyanizer/service-worker.js",
     "static/css/main.27fd15f6.chunk.css.map": "/wenyanizer/static/css/main.27fd15f6.chunk.css.map",
-    "static/js/2.393b5c89.chunk.js.LICENSE": "/wenyanizer/static/js/2.393b5c89.chunk.js.LICENSE"
+    "static/js/2.cd9135d7.chunk.js.LICENSE": "/wenyanizer/static/js/2.cd9135d7.chunk.js.LICENSE"
   },
   "entrypoints": [
     "static/js/runtime-main.7680ceea.js",
-    "static/js/2.393b5c89.chunk.js",
+    "static/js/2.cd9135d7.chunk.js",
     "static/css/main.27fd15f6.chunk.css",
-    "static/js/main.72f5c65c.chunk.js"
+    "static/js/main.77a027aa.chunk.js"
   ]
 }
