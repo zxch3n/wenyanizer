@@ -1,17 +1,16 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
 const { getRandomChineseName, LAMBDA } = require("./utils");
-GLOBAL_OBJECTS = [
-  "String",
-  "document",
-  "global",
-  "window",
-  "Math",
-  "Object",
-  "Array",
-  "Number",
-  ""
-];
+// const GLOBAL_OBJECTS = [
+//   "String",
+//   "document",
+//   "global",
+//   "window",
+//   "Math",
+//   "Object",
+//   "Array",
+//   "Number",
+// ];
 
 // TODO: refactor!!
 
@@ -29,7 +28,7 @@ function js2asc(jsStr) {
 
 function ascPostProcess(asc) {
   function getIdenOnlyUsedOnce() {
-    count = {};
+    const count = {};
     function add(name) {
       if (count[name] == null) {
         count[name] = 1;
@@ -125,7 +124,6 @@ var varSet = new Set();
 function getNextTmpName() {
   const name = getRandomChineseName(varSet);
   tmpVars.push(name);
-  varIndex++;
   return name;
 }
 
@@ -264,7 +262,7 @@ function isReassigned(name, node) {
   }
 
   for (const key in node) {
-    if (node.hasOwnProperty(key) && isReassigned(name, node[key])) {
+    if (isReassigned(name, node[key])) {
       return true;
     }
   }
@@ -312,7 +310,6 @@ function isIteratingFromZeroToN(_node) {
  */
 function ast2asc(ast, js) {
   tmpVars = [];
-  varIndex = 0;
   allVars = [];
   varSet = new Map();
   const signatureCache = {};
@@ -397,10 +394,10 @@ function ast2asc(ast, js) {
         break;
       case "ObjectExpression":
         assert(_node._name != null);
-        addVarOp([_node._name], [], 'obj');
+        addVarOp([_node._name], [], "obj");
         initObjectProperties(_node._name, _node.properties);
         break;
-      case "ReturnStatement":
+      case "ReturnStatement": {
         const v = {
           op: "return",
           value: getTripleProp(_node.argument, false),
@@ -411,6 +408,7 @@ function ast2asc(ast, js) {
         }
         ans.push(v);
         break;
+      }
       case "ForStatement":
         // TODO: Currently it only supports `for (let i = 0; i < n; i++)`,
         // or `for (const a of b)`
@@ -436,18 +434,7 @@ function ast2asc(ast, js) {
         handleMemberExpression(_node);
         break;
       case "ArrayExpression":
-        const name = _node._name || getNextTmpName();
-        addVarOp([name], [], 'arr');
-        ans.push({
-          op: "push",
-          container: name,
-          values: _node.elements.map((x) => getTripleProp(x, false))
-        });
-
-        if (_node._name == null) {
-          // Stage this variable
-          addVarOp([], [['iden', name]], 'arr');
-        }
+        handleArrayExpression(_node);
         break;
       case "UnaryExpression":
         ans.push({
@@ -456,21 +443,28 @@ function ast2asc(ast, js) {
           pos: _node.start
         });
         break;
-      case "LogicalExpression":
-        ans.push({
-          op: "op" + _node.operator,
-          lhs: getTripleProp(_node.left),
-          rhs: getTripleProp(_node.right, true)
-        });
-        break;
       case "FunctionDeclaration":
-        addVarOp([_node.id.name], [], 'fun');
+        addVarOp([_node.id.name], [], "fun");
         addFunction(_node);
         break;
       case "EmptyStatement":
         break;
       default:
         notImpErr(_node);
+    }
+  }
+
+  function handleArrayExpression(_node) {
+    const name = _node._name || getNextTmpName();
+    addVarOp([name], [], "arr");
+    ans.push({
+      op: "push",
+      container: name,
+      values: _node.elements.map((x) => getTripleProp(x, false))
+    });
+    if (_node._name == null) {
+      // Stage this variable
+      addVarOp([], [["iden", name]], "arr");
     }
   }
 
@@ -482,7 +476,7 @@ function ast2asc(ast, js) {
     varSet.set(name, type);
   }
 
-  function addNameOp(names) {
+  function addNamingOp(names) {
     ans.push({
       op: "name",
       names: names
@@ -510,7 +504,7 @@ function ast2asc(ast, js) {
 
   function saveStagedToNewVar() {
     const newName = getNextTmpName();
-    addNameOp([newName]);
+    addNamingOp([newName]);
     return newName;
   }
 
@@ -678,7 +672,7 @@ function ast2asc(ast, js) {
       }
 
       const name = getNextTmpName();
-      addNameOp([name]);
+      addNamingOp([name]);
       return ["iden", name, _node.start];
     }
 
@@ -837,7 +831,7 @@ function ast2asc(ast, js) {
     ));
     if (type === "iden") {
       type = varSet.get(values[0]);
-      assert(type != null)
+      assert(type != null);
     }
 
     addVarOp(names, tripleRep, type);
@@ -1045,10 +1039,10 @@ function ast2asc(ast, js) {
       if (
         _node.left.object.type === "Identifier" &&
         _node.left.property.type === "BinaryExpression" &&
-          _node.left.property.operator === "-" &&
-          _node.left.property.right.value === 1
+        _node.left.property.operator === "-" &&
+        _node.left.property.right.value === 1
       ) {
-        lhssubs = getTripleProp(_node.left.property.left, false);
+        const lhssubs = getTripleProp(_node.left.property.left, false);
         ans.push({
           op: "reassign",
           lhssubs,
@@ -1083,13 +1077,13 @@ function ast2asc(ast, js) {
     }
   }
 
-  function handleDeclaration(_node, defaultType = "num") {
+  function handleDeclaration(_node, defaultType = "obj") {
     const names = [];
     for (let i = 0; i < _node.declarations.length; i++) {
       const declarator = _node.declarations[i];
       const name = declarator.id.name;
       if (declarator.init == null) {
-        addVarOp([name], [], "obj");
+        addVarOp([name], [], defaultType);
         names.push(name);
       } else if (
         declarator.init.type === "BinaryExpression" ||
@@ -1101,6 +1095,7 @@ function ast2asc(ast, js) {
         declarator.init._name = name;
         process(declarator.init);
         if (COMPARE_OPERATORS.includes(declarator.init.operator)) {
+          // FIXME: This is a ad-hoc fix for https://github.com/LingDong-/wenyan-lang/issues/317
         } else if (varSet.has(name)) {
           ans.push({
             op: "reassign",
@@ -1108,7 +1103,7 @@ function ast2asc(ast, js) {
             rhs: ["ans", null]
           });
         } else {
-          addNameOp([name]);
+          addNamingOp([name]);
         }
         names.push(name);
       } else {
@@ -1121,6 +1116,8 @@ function ast2asc(ast, js) {
             declarator.init.body.extra &&
             declarator.init.body.extra.raw === "0"
           ) {
+            // Empty function
+            return;
           } else if (
             declarator.init.type === "ArrowFunctionExpression" ||
             declarator.init.type === "FunctionExpression"
@@ -1175,11 +1172,6 @@ function ast2asc(ast, js) {
     let toIgnoreValues = type === "fun" || type === "arr" || type === "obj";
     if (type === "iden") {
       type = varSet.get(value) || "obj";
-      // Try to compress
-      const name = value;
-      if (namesOnlyUsedOnce.has(name)) {
-        const last = ans[ans.length - 1];
-      }
     }
     if (type === "bool") {
       type = "bol";
@@ -1246,7 +1238,7 @@ function ast2asc(ast, js) {
             value: ["lit", `"${_node.property.value}"`]
           });
         } else {
-          assert(_node.property.type === 'NumericLiteral')
+          assert(_node.property.type === "NumericLiteral");
           ans.push({
             op: "subscript",
             container: object.name,
