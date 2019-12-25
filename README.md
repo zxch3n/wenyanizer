@@ -34,6 +34,10 @@ function wenyanize(js){
 是謂「文言轉換」之術也。
 /]:#()
 
+# Introduction
+
+Inspired by the great [**Wenyan Lang**](https://github.com/LingDong-/wenyan-lang) project, which compile ancient Chinese Language to javascript code, I build this project to do the opposite thing -- to **parse javascript to Wenyan**.
+
 # Usage
 
 Install wenyanizer. Run
