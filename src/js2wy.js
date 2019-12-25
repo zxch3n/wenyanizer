@@ -341,7 +341,6 @@ function isIteratingFromZeroToN(_node) {
 function ast2asc(ast, js) {
   tmpVars = [];
   allVars = [];
-  varSet = new Map();
   const signatureCache = {};
   const namesOnlyUsedOnce = getNamesOnlyUsedOnce(ast.program.body);
   const nodes = ast.program.body;
@@ -351,6 +350,13 @@ function ast2asc(ast, js) {
   const INDEX_FUNC = "求索";
   const INDEX_ASSIGN_SIGNATURE = "JS_INDEX_ASSIGN()";
   const INDEX_ASSIGN_FUNC = "賦值";
+  const JS_SUBSCRIPT = "JsSubscript()";
+  const JS_SUBSCRIPT_FUN = "獲取";
+  varSet = new Map();
+  varSet.set(NEW_FUNC_NAME, 1)
+  varSet.set(INDEX_FUNC, 1)
+  varSet.set(INDEX_ASSIGN_FUNC, 1)
+  varSet.set(JS_SUBSCRIPT_FUN, 1)
   let ans = [];
   const polyfillAns = [];
   for (var node of nodes) {
@@ -815,20 +821,20 @@ function ast2asc(ast, js) {
 
   function wrapJsSubscript(obj, field) {
     wrapJsNativeFunction(
-      'JsSubscript()',
-      '獲取',
+      JS_SUBSCRIPT,
+      JS_SUBSCRIPT_FUN,
       [
-        {type: 'object', name: '對象'},
-        { type: "obj", name: "域" },
+        { type: "obj", name: "對象" },
+        { type: "obj", name: "域" }
       ],
       "對象[域]"
-    )
+    );
 
     ans.push({
-      op: 'call',
-      func: '獲取',
+      op: "call",
+      fun: JS_SUBSCRIPT_FUN,
       args: [obj, field]
-    })
+    });
   }
 
   function wrapJsIndexAssignment(lhs, lhssubs, rhs) {
@@ -1471,12 +1477,20 @@ function ast2asc(ast, js) {
           container: object.name
         });
       } else if (_node.property.name != null) {
-        // wrapJsIndexing(_node.property);
-        ans.push({
-          op: "subscript",
-          container: object.name,
-          value: ["lit", `"${_node.property.name}"`]
-        });
+        if (_node.computed) {
+          // a[b]
+          wrapJsSubscript(
+            getTripleProp(_node.object),
+            getTripleProp(_node.property)
+          );
+        } else {
+          // a.b
+          ans.push({
+            op: "subscript",
+            container: object.name,
+            value: ["lit", `"${_node.property.name}"`]
+          });
+        }
       } else if (_node.property.value != null) {
         if (_node.property.type === "StringLiteral") {
           ans.push({

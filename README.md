@@ -151,10 +151,10 @@ var 乙 = 100 * 200 + 35 * (48 - 10) * 甲;
 | `a.b = 3` | ✔ |
 | new | ✔ |
 | `this` keyword | ✔ |
+| `a[b] = 3` | ✔ |
 | [Wenyan Lib](https://github.com/LingDong-/wenyan-lang/issues/290) | WIP |
 | [Wenyan Nested Function Call](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
 | [Optimize Curried Function](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
-| `a[b] = 3` | ❌ |
 | switch | ❌ |
 | try...catch...finally | ❌ |
 | require (CommonJS) | ❌ |
