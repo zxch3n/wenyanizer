@@ -1316,7 +1316,7 @@ function ast2asc(ast, js) {
       wrapJsIndexAssignment(
         getTripleProp(_node.left.object),
         getTripleProp(_node.left.property),
-        getTripleProp(_node.right, true)
+        getTripleProp(_node.right, false)
       );
       // Clear the stack
       ans.push({
