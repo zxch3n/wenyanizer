@@ -12,8 +12,11 @@ const { getRandomChineseName, LAMBDA } = require("./utils");
 //   "Number",
 // ];
 
-// TODO: use wrapXxxExpression as the function name when one will push the output to the stack
-// TODO: use handleXxxExpression as the function name when one will NOT push things to the stack
+//  Function names:
+//
+//    use handleXxxExpression when it may either push or consume the stack
+//    use wrapXxxExpression as the function name when one will push the output to the stack
+//    use consumeXxxExpression when it will consume the stack
 
 function js2wy(jsStr) {
   const asc = js2asc(jsStr);
@@ -344,6 +347,10 @@ function ast2asc(ast, js) {
   const nodes = ast.program.body;
   const NEW_SIGNATURE = "JS_NEW()";
   const NEW_FUNC_NAME = "造物";
+  const INDEX_SIGNATURE = "JS_INDEX()";
+  const INDEX_FUNC = "求索";
+  const INDEX_ASSIGN_SIGNATURE = "JS_INDEX_ASSIGN()";
+  const INDEX_ASSIGN_FUNC = "賦值";
   let ans = [];
   const polyfillAns = [];
   for (var node of nodes) {
@@ -352,9 +359,9 @@ function ast2asc(ast, js) {
 
   if (polyfillAns.length) {
     polyfillAns.push({
-      op: 'comment',
-      value: ['lit', `"================================="`]
-    })
+      op: "comment",
+      value: ["lit", `"================================="`]
+    });
     ans = polyfillAns.concat(ans);
   }
 
@@ -565,7 +572,7 @@ function ast2asc(ast, js) {
     }
   }
 
-  function addVarOp(names, values, type, polyfill=false) {
+  function addVarOp(names, values, type, polyfill = false) {
     const count = Math.max(names.length, values.length);
     for (let i = 0; i < count; i++) {
       if (names[i]) {
@@ -748,15 +755,13 @@ function ast2asc(ast, js) {
     });
   }
 
-  function wrapJsNewExpression(_node) {
-    assertStrongly(_node.type === "NewExpression");
-    if (!(NEW_SIGNATURE in signatureCache)) {
-      addVarOp([NEW_FUNC_NAME], [], "fun", true);
+  function wrapJsNativeFunction(signature, funcName, args, value) {
+    if (!(signature in signatureCache)) {
+      addVarOp([funcName], [], "fun", true);
       polyfillAns.push({
         op: "fun",
-        arity: 1,
-        args: [{ type: "obj", name: "蓝图" }],
-        pos: _node.start
+        arity: args.length,
+        args: args
       });
 
       polyfillAns.push({
@@ -764,20 +769,84 @@ function ast2asc(ast, js) {
       });
       polyfillAns.push({
         op: "return",
-        value: ["data", "new 蓝图(...Array.prototype.slice.call(arguments, 1))"]
+        value: ["data", value]
       });
       polyfillAns.push({
         op: "funend"
       });
-      signatureCache[NEW_SIGNATURE] = NEW_FUNC_NAME;
+      signatureCache[signature] = funcName;
     }
+  }
+
+  function wrapJsNewExpression(_node) {
+    assertStrongly(_node.type === "NewExpression");
+    wrapJsNativeFunction(
+      NEW_SIGNATURE,
+      NEW_FUNC_NAME,
+      [{ type: "obj", name: "蓝图" }],
+      "new 蓝图(...Array.prototype.slice.call(arguments, 1))"
+    );
 
     ans.push({
       op: "call",
       fun: NEW_FUNC_NAME,
-      args: [_node.callee].concat(_node.arguments)
+      args: [_node.callee]
+        .concat(_node.arguments)
         .map((x) => getTripleProp(x, false)),
       pos: _node.start
+    });
+  }
+
+  function wrapJsIndexing(_node) {
+    wrapJsNativeFunction(
+      INDEX_SIGNATURE,
+      INDEX_FUNC,
+      [{ type: "obj", name: "道" }],
+      "typeof 道 === 'string'? 道 : 道 + 1"
+    );
+
+    ans.push({
+      op: "call",
+      fun: INDEX_FUNC,
+      args: [getTripleProp(_node)],
+      pos: _node.start
+    });
+  }
+
+  function wrapJsSubscript(obj, field) {
+    wrapJsNativeFunction(
+      'JsSubscript()',
+      '獲取',
+      [
+        {type: 'object', name: '對象'},
+        { type: "obj", name: "域" },
+      ],
+      "對象[域]"
+    )
+
+    ans.push({
+      op: 'call',
+      func: '獲取',
+      args: [obj, field]
+    })
+  }
+
+  function wrapJsIndexAssignment(lhs, lhssubs, rhs) {
+    wrapJsNativeFunction(
+      INDEX_ASSIGN_SIGNATURE,
+      INDEX_ASSIGN_FUNC,
+      [
+        { type: "obj", name: "對象" },
+        { type: "obj", name: "域" },
+        { type: "obj", name: "值" }
+      ],
+      "對象[域] = 值;"
+    );
+
+    ans.push({
+      op: "call",
+      fun: INDEX_ASSIGN_FUNC,
+      args: [lhs, lhssubs, rhs]
     });
   }
 
@@ -1235,7 +1304,18 @@ function ast2asc(ast, js) {
         rhs: getTripleProp(_node.right, true)
       });
     } else {
-      notImpErr(_node);
+      // wrapJsIndexing(_node.left.property);
+      // const name = getNextTmpName();
+      // addNamingOp([name]);
+      wrapJsIndexAssignment(
+        getTripleProp(_node.left.object),
+        getTripleProp(_node.left.property),
+        getTripleProp(_node.right, true)
+      );
+      // Clear the stack
+      ans.push({
+        op: "discard"
+      });
     }
   }
 
@@ -1391,6 +1471,7 @@ function ast2asc(ast, js) {
           container: object.name
         });
       } else if (_node.property.name != null) {
+        // wrapJsIndexing(_node.property);
         ans.push({
           op: "subscript",
           container: object.name,

@@ -156,6 +156,7 @@ var 乙 = 100 * 200 + 35 * (48 - 10) * 甲;
 | [Optimize Curried Function](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
 | `a[b] = 3` | ❌ |
 | switch | ❌ |
+| try...catch...finally | ❌ |
 | require (CommonJS) | ❌ |
 | export | ❌ |
 | es6 ^ | ❌ |
