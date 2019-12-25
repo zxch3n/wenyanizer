@@ -5,12 +5,11 @@ import {
   createMuiTheme
 } from "@material-ui/core/styles";
 import { Component as Editor } from "./Editor";
-import useMediaQuery from "@material-ui/core/useMediaQuery";
 import Paper from "@material-ui/core/Paper";
 import Grid from "@material-ui/core/Grid";
 import CssBaseline from "@material-ui/core/CssBaseline";
 import { debounce } from "lodash";
-import { js2wy } from "./js2wy";
+import { js2wy } from "wenyanizer";
 import "./App.css";
 
 const useStyles = makeStyles((theme) => ({
@@ -31,6 +30,8 @@ const useStyles = makeStyles((theme) => ({
     textAlign: "center"
   },
   paper: {
+    maxHeight: 'max(calc(100vh - 250px), 400px)',
+    overflow: 'auto',
     paddingTop: theme.spacing(2),
     paddingBottom: theme.spacing(2),
     paddingLeft: theme.spacing(4),
@@ -78,7 +79,7 @@ export default function AutoGrid() {
     debounce((v) => {
       setJs(v);
       onJsChanged(v);
-    }, 50),
+    }, 20),
     []
   );
 
@@ -90,7 +91,7 @@ export default function AutoGrid() {
           <h1>文言转换 <a className={classes.a} href="https://github.com/zxch3n/wenyanizer">Wenyanizer</a></h1>
           <p>
             JavaScript →{" "}
-            <a className={classes.a} href="https://github.com/LingDong-/wenyan-lang">Wenyan Lang</a>
+            <a className={classes.a} href="https://github.com/LingDong-/wenyan-lang">文言文 Wenyan Lang</a>
           </p>
         </div>
         <Grid
