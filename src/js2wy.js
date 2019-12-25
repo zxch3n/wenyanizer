@@ -29,21 +29,21 @@ function js2asc(jsStr) {
   try {
     jsAst = parse(jsStr);
   } catch (e) {
-    e.msg = "JavaScript Grammar Error\n" + e.msg;
+    e.message = "[JavaScript Grammar Error] " + e.message;
     throw e;
   }
 
   try {
     asc = ast2asc(jsAst, jsStr);
   } catch (e) {
-    e.msg = "Ast2asc Error" + e.msg;
+    e.message = "[Ast2asc Error] " + e.message;
     throw e;
   }
 
   try {
     ascPostProcess(asc);
   } catch (e) {
-    e.msg = "Post-processing error" + e.msg;
+    e.message = "[Post-processing error] " + e.message;
     throw e;
   }
 
@@ -188,6 +188,8 @@ const LITERALS = {
 
 const COMPARE_OPERATORS = ["!=", "==", ">=", "<=", "<", ">", "===", "!=="];
 const OPERATORS = [
+  '===',
+  '!==',
   "!=",
   "==",
   ">=",
