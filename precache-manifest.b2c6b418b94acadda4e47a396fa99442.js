@@ -1,10 +1,10 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "74cc4bf52e3cd34d165efbf8482b82af",
+    "revision": "a155e4597e3ab6b8b99629ba6c67e4ce",
     "url": "/wenyanizer/index.html"
   },
   {
-    "revision": "dbd13bcb2ecc28f05362",
+    "revision": "ef55f954b820788a6932",
     "url": "/wenyanizer/static/css/main.27fd15f6.chunk.css"
   },
   {
@@ -16,8 +16,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/wenyanizer/static/js/2.3f00e188.chunk.js.LICENSE"
   },
   {
-    "revision": "dbd13bcb2ecc28f05362",
-    "url": "/wenyanizer/static/js/main.77a027aa.chunk.js"
+    "revision": "ef55f954b820788a6932",
+    "url": "/wenyanizer/static/js/main.1ff1d87e.chunk.js"
   },
   {
     "revision": "d62ca267bdf6dee0d599",
