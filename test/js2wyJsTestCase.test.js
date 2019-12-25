@@ -49,6 +49,9 @@ function runTestCase(file) {
 
     gt = run(jsText);
     gen = run(genJs);
+    if (file.includes('sudoku')) {
+      console
+    }
     assert.equal(gen, gt);
   } catch (e) {
     throw e;
