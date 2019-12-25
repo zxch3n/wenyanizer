@@ -410,8 +410,12 @@ function ast2asc(ast, js) {
       case "IfStatement":
         addIfTestExpression(_node);
 
-        for (const subNode of _node.consequent.body) {
-          process(subNode);
+        if (_node.consequent.body) {
+          for (const subNode of _node.consequent.body) {
+            process(subNode);
+          }
+        } else {
+          process(_node.consequent);
         }
 
         if (_node.alternate) {
@@ -642,7 +646,7 @@ function ast2asc(ast, js) {
           getTripleProp(_node.property.left, false)
         ];
       } else {
-        notImpErr(_node);
+        return [getTripleProp(_node, false)]
       }
     } else if (_node.type in LITERAL_TYPES) {
       return [getTripleProp(_node, false)];
@@ -1042,6 +1046,10 @@ function ast2asc(ast, js) {
       op: "funend",
       pos: funcNode.end
     });
+    // clear the stack
+    ans.push({
+      op: 'discard'
+    })
   }
 
   function createTempVarToWrap(values, type = undefined, names = []) {
@@ -1093,6 +1101,12 @@ function ast2asc(ast, js) {
         test: [getTripleProp(_node.test, false)],
         pos: _node.start
       });
+    } else if (_node.test.type === 'CallExpression') {
+      // FIXME: unsure
+      ans.push({
+        op: 'if',
+        test: [getTripleProp(_node.test, false)],
+      })
     } else {
       notImpErr(_node);
     }
