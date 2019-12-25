@@ -1,9 +1,9 @@
 /**
  * The ASC here is a little bit diff from Wenyan ASC
- * 
+ *
  * 1. The ASC used here should support `op==`, `op>=`, ...
  * 2. {op: "op", ...} may include another field called `name`, indicating the the assignment target
- * 
+ *
  */
 const parser = require("@babel/parser");
 const { num2hanzi } = require("./hanzi2num");
@@ -170,7 +170,7 @@ function asc2wy(asc) {
         ans += `曰${getValue(node.values[i])}。`;
       } else if (node.type === "num" && n > 1) {
         ans += "曰零。";
-      } else if (node.type === 'str' && n > 1){
+      } else if (node.type === "str" && n > 1) {
         ans += "曰「「」」。";
       }
     }
@@ -238,7 +238,9 @@ function asc2wy(asc) {
           throw new Error();
         }
 
-        ans += `吾有一爻。名之曰${wrapVar(node.name)}。若${getValue(node.lhs)}${COMPARATORS[node.op.slice(2)]}${getValue(node.rhs)}者。昔之${wrapVar(node.name)}者。今陽是矣云云。`
+        ans += `吾有一爻。名之曰${wrapVar(node.name)}。若${getValue(node.lhs)}${
+          COMPARATORS[node.op.slice(2)]
+        }${getValue(node.rhs)}者。昔之${wrapVar(node.name)}者。今陽是矣云云。`;
         break;
       default:
         console.log(node);
@@ -349,13 +351,15 @@ function asc2wy(asc) {
         ans += `是謂「${funcNames.pop()}」之術也。\n\n`;
         break;
       case "push":
-        addIndent();
-        ans += `充「${node.container}」以${getValue(node.values[0])}。`;
-        for (let i = 1; i < node.values.length; i++) {
-          ans += `以${getValue(node.values[i])}。`;
-        }
+        if (node.values.length) {
+          addIndent();
+          ans += `充「${node.container}」以${getValue(node.values[0])}。`;
+          for (let i = 1; i < node.values.length; i++) {
+            ans += `以${getValue(node.values[i])}。`;
+          }
 
-        ans += "\n";
+          ans += "\n";
+        }
         break;
       case "break":
         addIndent();

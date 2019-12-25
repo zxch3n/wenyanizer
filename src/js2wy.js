@@ -1,16 +1,17 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
 const { getRandomChineseName, LAMBDA } = require("./utils");
-// const GLOBAL_OBJECTS = [
-//   "String",
-//   "document",
-//   "global",
-//   "window",
-//   "Math",
-//   "Object",
-//   "Array",
-//   "Number",
-// ];
+const GLOBAL_OBJECTS = [
+  "String",
+  "document",
+  "global",
+  "window",
+  "Math",
+  "Object",
+  "JSON",
+  "Array",
+  "Number",
+];
 
 //  Function names:
 //
