@@ -21,9 +21,28 @@ function js2wy(jsStr) {
 }
 
 function js2asc(jsStr) {
-  const jsAst = parse(jsStr);
-  const asc = ast2asc(jsAst, jsStr);
-  ascPostProcess(asc);
+  var jsAst, asc;
+  try {
+    jsAst = parse(jsStr);
+  } catch (e) {
+    e.msg = "JavaScript Grammar Error\n" + e.msg;
+    throw e;
+  }
+
+  try {
+    asc = ast2asc(jsAst, jsStr);
+  } catch (e) {
+    e.msg = "Ast2asc Error" + e.msg;
+    throw e;
+  }
+
+  try {
+    ascPostProcess(asc);
+  } catch (e) {
+    e.msg = "Post-processing error" + e.msg;
+    throw e;
+  }
+
   return asc;
 }
 
@@ -325,9 +344,18 @@ function ast2asc(ast, js) {
   const nodes = ast.program.body;
   const NEW_SIGNATURE = "JS_NEW()";
   const NEW_FUNC_NAME = "造物";
-  const ans = [];
+  let ans = [];
+  const polyfillAns = [];
   for (var node of nodes) {
     process(node);
+  }
+
+  if (polyfillAns.length) {
+    polyfillAns.push({
+      op: 'comment',
+      value: ['lit', `"================================="`]
+    })
+    ans = polyfillAns.concat(ans);
   }
 
   return ans;
@@ -537,7 +565,7 @@ function ast2asc(ast, js) {
     }
   }
 
-  function addVarOp(names, values, type) {
+  function addVarOp(names, values, type, polyfill=false) {
     const count = Math.max(names.length, values.length);
     for (let i = 0; i < count; i++) {
       if (names[i]) {
@@ -548,13 +576,20 @@ function ast2asc(ast, js) {
         assert(values[i][0] == null || typeof values[i][0] === "string");
       }
     }
-    ans.push({
+
+    const op = {
       op: "var",
       count,
       names,
       values,
       type
-    });
+    };
+
+    if (polyfill) {
+      polyfillAns.push(op);
+    } else {
+      ans.push(op);
+    }
 
     for (const name of names) {
       registerNewName(name, type);
@@ -683,8 +718,8 @@ function ast2asc(ast, js) {
       funcName = getNextTmpName();
       signatureCache[signature] = funcName;
       // TODO: refactor, extract all func together
-      addVarOp([funcName], [], "fun");
-      ans.push({
+      addVarOp([funcName], [], "fun", true);
+      polyfillAns.push({
         op: "fun",
         arity: _node.arguments.length,
         args: _node.arguments.map((x, index) => {
@@ -693,14 +728,14 @@ function ast2asc(ast, js) {
         pos: _node.start
       });
 
-      ans.push({
+      polyfillAns.push({
         op: "funbody"
       });
-      ans.push({
+      polyfillAns.push({
         op: "return",
         value: ["data", signature]
       });
-      ans.push({
+      polyfillAns.push({
         op: "funend"
       });
     }
@@ -716,22 +751,22 @@ function ast2asc(ast, js) {
   function wrapJsNewExpression(_node) {
     assertStrongly(_node.type === "NewExpression");
     if (!(NEW_SIGNATURE in signatureCache)) {
-      addVarOp([NEW_FUNC_NAME], [], "fun");
-      ans.push({
+      addVarOp([NEW_FUNC_NAME], [], "fun", true);
+      polyfillAns.push({
         op: "fun",
         arity: 1,
         args: [{ type: "obj", name: "蓝图" }],
         pos: _node.start
       });
 
-      ans.push({
+      polyfillAns.push({
         op: "funbody"
       });
-      ans.push({
+      polyfillAns.push({
         op: "return",
         value: ["data", "new 蓝图(...Array.prototype.slice.call(arguments, 1))"]
       });
-      ans.push({
+      polyfillAns.push({
         op: "funend"
       });
       signatureCache[NEW_SIGNATURE] = NEW_FUNC_NAME;
