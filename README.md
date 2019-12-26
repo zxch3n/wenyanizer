@@ -160,14 +160,22 @@ Restricted by current Wenyan grammar, some hacks are required to make this compi
 | Wraping global object when necessary, such as `Math`, `JSON`  | ✔    |
 | `console.log` | ✔  |
 | `a.b = 3` | ✔ |
-| new | ✔ |
+| NewExpression | ✔ |
+| Function | ✔ |
 | `this` keyword | ✔ |
 | `a[b] = 3` | ✔ |
+| ForOfStatement | ✔ |
 | [Wenyan Lib](https://github.com/LingDong-/wenyan-lang/issues/290) | WIP |
 | [Wenyan Nested Function Call](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
 | [Optimize Curried Function](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
 | switch | ❌ |
-| try...catch...finally | ❌ |
-| require (CommonJS) | ❌ |
-| export | ❌ |
-| es6 ^ | ❌ |
+| bit op | ❌ |
+| `null` `undefined` | ❌ |
+| DebugExpression | ❌ |
+| WithStatement | ❌ |
+| `continue` | ❌ |
+| debug exp | ❌ |
+| ForInStatement | ❌ |
+| throw try...catch...finally | ❌ |
+| Modules (import, export, require) | ❌ |
+| es6 ^ (Class, Promise, yield, await...) | WON'T FIX |
