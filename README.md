@@ -156,8 +156,8 @@ Restricted by current Wenyan grammar, some hacks are required to make this compi
 | Closure      |  ✔    |
 | Control: While/For/If/Else      | ✔    |
 | Object `var a = {a: 0, b: 1, c: 2}`  |  ✔  |
-| Array      | ✔  |
-| `+, -, *, /, &&, ||`  | ✔  |
+| Array `[[[0 ,2], [2, []]]]`     | ✔  |
+| `+-*/`  | ✔  |
 | `--, ++, +=, -=, /=`  | ✔  |
 | Distinguish `a++` and `++a`  | ✔  |
 | Wraping global object when necessary, such as `Math`, `JSON`  | ✔    |
