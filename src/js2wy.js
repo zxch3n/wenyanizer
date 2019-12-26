@@ -388,19 +388,22 @@ function ast2asc(ast, js) {
       case "CallExpression":
         handleExpressionStatement(_node);
         break;
+      case "DoWhileStatement":
       case "WhileStatement":
-        if (_node.test.type === "BooleanLiteral") {
-          if (_node.test.value === true) {
-            ans.push({
-              op: "whiletrue"
-            });
-          }
-        } else {
-          notImpErr(_node);
+        ans.push({
+          op: "whiletrue"
+        });
+
+        if (_node.type === 'WhileStatement'){
+          breakWhenTestIsFalse(_node.test);
         }
 
         for (const subNode of _node.body.body) {
           process(subNode);
+        }
+
+        if (_node.type === 'DoWhileStatement') {
+          breakWhenTestIsFalse(_node.test);
         }
 
         ans.push({
@@ -505,6 +508,24 @@ function ast2asc(ast, js) {
       default:
         notImpErr(_node);
     }
+  }
+
+  function breakWhenTestIsFalse(test) {
+    const v = getTripleProp(test);
+    ans.push({
+      op: 'if',
+      test: [
+        v,
+        ['cmp', '=='],
+        ['num', 0]
+      ]
+    });
+    ans.push({
+      op: 'break'
+    });
+    ans.push({
+      op: 'end'
+    });
   }
 
   function wrapBinaryExpression(_node) {
@@ -1065,50 +1086,43 @@ function ast2asc(ast, js) {
     addVarOp(names, tripleRep, type);
   }
 
-  function addIfTestExpression(_node) {
-    if (_node.test.type === "BinaryExpression") {
-      if (COMPARE_OPERATORS.includes(_node.test.operator)) {
-        ans.push({
-          op: "if",
-          test: [
-            ...getIfProp(_node.test.left),
-            ["cmp", _node.test.operator],
-            ...getIfProp(_node.test.right)
-          ]
-        });
-      } else if (_node.test in LITERAL_TYPES) {
-        ans.push({
-          op: "if",
-          test: [getTripleProp(_node.test, false)]
-        });
+  function getTest(test) {
+    if (test.type === "BinaryExpression") {
+      if (COMPARE_OPERATORS.includes(test.operator)) {
+        return [
+            ...getIfProp(test.left),
+            ["cmp", test.operator],
+            ...getIfProp(test.right)
+        ]
+      } else if (test in LITERAL_TYPES) {
+        return [getTripleProp(test, false)];
       } else {
-        notImpErr(_node);
+        notImpErr(test);
       }
-    } else if (_node.test.type in LITERAL_TYPES) {
-      ans.push({
-        op: "if",
-        test: [getTripleProp(_node.test, false)],
-        pos: _node.start
-      });
+    } else if (test.type in LITERAL_TYPES) {
+      return [getTripleProp(test, false)];
     } else if (
-      _node.test.type === "LogicalExpression" ||
-      _node.test.type === "BinaryExpression" ||
-      _node.test.type === "UnaryExpression"
+      test.type === "LogicalExpression" ||
+      test.type === "BinaryExpression" ||
+      test.type === "UnaryExpression"
     ) {
-      ans.push({
-        op: "if",
-        test: [getTripleProp(_node.test, false)],
-        pos: _node.start
-      });
-    } else if (_node.test.type === 'CallExpression') {
+      return [getTripleProp(test, false)];
+    } else if (test.type === 'CallExpression') {
       // FIXME: unsure
-      ans.push({
-        op: 'if',
-        test: [getTripleProp(_node.test, false)],
-      })
+      return [getTripleProp(test, false)];
     } else {
-      notImpErr(_node);
+      notImpErr(test);
     }
+
+    notImpErr(test);
+  }
+
+  function addIfTestExpression(_node) {
+    ans.push({
+      op: 'if',
+      test: getTest(_node.test),
+      pos: _node.start
+    })
   }
 
   function handleExpressionStatement(_node) {
@@ -1250,6 +1264,19 @@ function ast2asc(ast, js) {
   }
 
   function handleAssignmentExpression(_node) {
+    if (_node.operator.length === 2) {
+      // if op in {+=, -=, *=, ...}
+      assertStrongly(_node.operator[1] === "=", _node);
+      _node.right = {
+        type: 'BinaryExpression',
+        operator: _node.operator[0],
+        left: _node.left,
+        right: _node.right
+      }
+
+      _node.operator = '=';
+    }
+
     assertStrongly(_node.operator === "=", _node);
     if (_node.left.type === "Identifier") {
       if (_node.right.type === "FunctionExpression") {

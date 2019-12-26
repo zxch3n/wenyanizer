@@ -153,10 +153,12 @@ Restricted by current Wenyan grammar, some hacks are required to make this compi
 | Name | Status |
 |:-----------------|:-------|
 | JS Code Compiled From Wenyan | ✔    |
-| Closure      | ✔    |
+| Closure      |  ✔    |
 | Control: While/For/If/Else      | ✔    |
 | Object `var a = {a: 0, b: 1, c: 2}`  |  ✔  |
-| Array      | ✔    |
+| Array      | ✔  |
+| `+, -, *, /, &&, ||`  | ✔  |
+| `--, ++, +=, -=, /=`  | ✔  |
 | Wraping global object when necessary, such as `Math`, `JSON`  | ✔    |
 | `console.log` | ✔  |
 | `a.b = 3` | ✔ |
@@ -168,6 +170,7 @@ Restricted by current Wenyan grammar, some hacks are required to make this compi
 | [Wenyan Lib](https://github.com/LingDong-/wenyan-lang/issues/290) | WIP |
 | [Wenyan Nested Function Call](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
 | [Optimize Curried Function](https://github.com/LingDong-/wenyan-lang/issues/322)  | ❌ |
+| RegExp | ❌ |
 | switch | ❌ |
 | bit op | ❌ |
 | `null` `undefined` | ❌ |
@@ -178,4 +181,6 @@ Restricted by current Wenyan grammar, some hacks are required to make this compi
 | ForInStatement | ❌ |
 | throw try...catch...finally | ❌ |
 | Modules (import, export, require) | ❌ |
+| `===` (will be compiled to `==`) | ❌ |
+| `let` \& `const` (will be compiled to `var`) | WON'T FIX |
 | es6 ^ (Class, Promise, yield, await...) | WON'T FIX |
