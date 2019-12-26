@@ -159,6 +159,7 @@ Restricted by current Wenyan grammar, some hacks are required to make this compi
 | Array      | ✔  |
 | `+, -, *, /, &&, ||`  | ✔  |
 | `--, ++, +=, -=, /=`  | ✔  |
+| Distinguish `a++` and `++a`  | ✔  |
 | Wraping global object when necessary, such as `Math`, `JSON`  | ✔    |
 | `console.log` | ✔  |
 | `a.b = 3` | ✔ |

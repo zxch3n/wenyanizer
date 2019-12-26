@@ -360,10 +360,12 @@ function ast2asc(ast, js) {
   varSet.set(INDEX_FUNC, 1)
   varSet.set(INDEX_ASSIGN_FUNC, 1)
   varSet.set(JS_SUBSCRIPT_FUN, 1)
+  let postProcess = []; // handle a++
   let ans = [];
   const polyfillAns = [];
   for (var node of nodes) {
     process(node);
+    consumePostProcess();
   }
 
   if (polyfillAns.length) {
@@ -375,6 +377,15 @@ function ast2asc(ast, js) {
   }
 
   return ans;
+
+
+  function consumePostProcess(){
+    for (var func of postProcess) {
+      func();
+    }
+
+    postProcess = [];
+  }
 
   function process(_node) {
     switch (_node.type) {
@@ -398,9 +409,7 @@ function ast2asc(ast, js) {
           breakWhenTestIsFalse(_node.test);
         }
 
-        for (const subNode of _node.body.body) {
-          process(subNode);
-        }
+        processAllNodesInBody(_node.body.body);
 
         if (_node.type === 'DoWhileStatement') {
           breakWhenTestIsFalse(_node.test);
@@ -414,9 +423,7 @@ function ast2asc(ast, js) {
         addIfTestExpression(_node);
 
         if (_node.consequent.body) {
-          for (const subNode of _node.consequent.body) {
-            process(subNode);
-          }
+          processAllNodesInBody(_node.consequent.body);
         } else {
           process(_node.consequent);
         }
@@ -425,8 +432,10 @@ function ast2asc(ast, js) {
           ans.push({
             op: "else"
           });
-          for (const subNode of _node.alternate.body) {
-            process(subNode);
+          if (_node.alternate.body) {
+            processAllNodesInBody(_node.alternate.body);
+          } else {
+            process(_node.alternate);
           }
         }
 
@@ -471,10 +480,7 @@ function ast2asc(ast, js) {
           iterator: getTripleProp(_node.left, false)[1]
         });
 
-        for (const subNode of _node.body.body) {
-          process(subNode);
-        }
-
+        processAllNodesInBody(_node.body.body);
         ans.push({
           op: "end"
         });
@@ -971,6 +977,11 @@ function ast2asc(ast, js) {
       }
     }
 
+    if (_node.type === 'UpdateExpression') {
+      handleUpdateExpression(_node);
+      return getTripleProp(_node.argument);
+    }
+
     tryTurnThisExpressionToIdentifier(_node);
     if (!(_node.type in LITERAL_TYPES)) {
       notImpErr(_node);
@@ -1059,9 +1070,7 @@ function ast2asc(ast, js) {
       op: "funbody",
       pos: funcNode.start
     });
-    for (const sub of funcNode.body.body) {
-      process(sub);
-    }
+    processAllNodesInBody(funcNode.body.body);
     ans.push({
       op: "funend",
       pos: funcNode.end
@@ -1144,26 +1153,56 @@ function ast2asc(ast, js) {
     }
   }
 
-  function handleUpdateExpression(_node) {
-    if (_node.operator === "++") {
-      ans.push({
-        op: "op+",
-        lhs: ["iden", _node.argument.name],
-        rhs: ["num", 1, _node.start]
-      });
-    } else if (_node.operator === "--") {
-      ans.push({
-        op: "op-",
-        lhs: ["iden", _node.argument.name],
-        rhs: ["num", 1, _node.start]
-      });
-    } else {
-      notImpErr(_node);
+  function handleUpdateExpressionImmediately(_node) {
+    assertStrongly(_node.operator === '++' || _node.operator === '--', _node);
+    if (_node.argument.type === 'MemberExpression') {
+      handleAssignWithLhsMemberExpression({
+          ..._node,
+        left: _node.argument,
+        right: {
+          ..._node,
+          type: 'BinaryExpression',
+          operator: _node.operator[0],
+          left: _node.argument,
+          right: {
+            ..._node,
+            type: "NumericLiteral",
+            value: 1,
+          }
+        },
+        type: "AssignmentExpression"
+      })
+      return;
     }
+
+    assertStrongly(_node.argument.type === 'Identifier', _node);
+    ans.push({
+      op: "op" + _node.operator[0],
+      lhs: ["iden", _node.argument.name],
+      rhs: ["num", 1, _node.start]
+    });
     addReassignOp({
       lhs: ["iden", _node.argument.name],
       rhs: ["ans", null]
     });
+  }
+
+  function handleUpdateExpression(_node) {
+    // Use _done flag to avoid execute update multiple times
+    // because getTripleProp may invoke this node from different ancester.
+    // I may need to cache getTripleProp
+    if (_node._done) {
+      return;
+    }
+
+    _node._done = true;
+    if (_node.prefix) {
+      handleUpdateExpressionImmediately(_node);
+    } else {
+      postProcess.push(()=>{
+        handleUpdateExpressionImmediately(_node);
+      })
+    }
   }
 
   function handleCallExpression(_node) {
@@ -1591,13 +1630,13 @@ function ast2asc(ast, js) {
     } else {
       notImpErr(_node);
     }
-    for (const subNode of _node.body.body) {
-      process(subNode);
-    }
+    processAllNodesInBody(_node.body.body);
     if (shouldInit) {
-      // Update before test
+      // Update before break test
       process(_node.update);
     }
+    // update i++ immediately
+    consumePostProcess();
     if (_node.test && shouldAddManualBreak) {
       ans.push({
         op: "if",
@@ -1613,6 +1652,15 @@ function ast2asc(ast, js) {
     ans.push({
       op: "end"
     });
+  }
+
+  function processAllNodesInBody(body) {
+    for (const subNode of body) {
+      consumePostProcess();
+      process(subNode);
+    }
+    
+    consumePostProcess();
   }
 }
 
