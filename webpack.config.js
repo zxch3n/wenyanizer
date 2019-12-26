@@ -16,5 +16,6 @@ module.exports = {
     extensions: ['.js', '.ts']
   },
   mode: 'production',
-  externals: [nodeExternals()]
+  // removing this may make front-end work?
+  // externals: [nodeExternals()]
 };
