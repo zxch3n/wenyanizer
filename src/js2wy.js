@@ -458,8 +458,6 @@ function ast2asc(ast, js) {
         break;
       }
       case "ForStatement":
-        // TODO: Currently it only supports `for (let i = 0; i < n; i++)`,
-        // or `for (const a of b)`
         handleForStatement(_node);
         break;
       case "ForOfStatement":
@@ -702,7 +700,8 @@ function ast2asc(ast, js) {
    *
    * @param {*} _node
    */
-  function callJsGlobalFunction(_node) {
+  function wrapJsGlobalFunction(_node, global=false) {
+    // FIXME: it also wrap function call on rhs
     assert(_node.type === "CallExpression");
     let signature = "";
     const args = [];
@@ -738,8 +737,8 @@ function ast2asc(ast, js) {
       funcName = getNextTmpName();
       signatureCache[signature] = funcName;
       // TODO: refactor, extract all func together
-      addVarOp([funcName], [], "fun", true);
-      polyfillAns.push({
+      addVarOp([funcName], [], "fun", false);
+      ans.push({
         op: "fun",
         arity: _node.arguments.length,
         args: _node.arguments.map((x, index) => {
@@ -748,14 +747,14 @@ function ast2asc(ast, js) {
         pos: _node.start
       });
 
-      polyfillAns.push({
+      ans.push({
         op: "funbody"
       });
-      polyfillAns.push({
+      ans.push({
         op: "return",
         value: ["data", signature]
       });
-      polyfillAns.push({
+      ans.push({
         op: "funend"
       });
     }
@@ -984,7 +983,7 @@ function ast2asc(ast, js) {
         pos: _node.start
       });
     } else {
-      callJsGlobalFunction(_node);
+      wrapJsGlobalFunction(_node);
     }
   }
 
@@ -1468,24 +1467,18 @@ function ast2asc(ast, js) {
     }
 
     tryTurnThisExpressionToIdentifier(object);
-    if (object.type !== "Identifier") {
-      notImpErr(_node);
-    }
-
-    if (_node.property.type === "BinaryExpression") {
-      if (_node.property.operator === "-" && _node.property.right.value === 1) {
+    assertStrongly(object.type === 'Identifier', _node, )
+    if (_node.property.type.endsWith('Expression')) {
+      if ( _node.property.operator === "-" && _node.property.right.value === 1) {
+        // a[b - 1]
         ans.push({
           op: "subscript",
           container: object.name,
           value: getTripleProp(_node.property.left, true)
         });
       } else {
-        process(_node.property);
-        ans.push({
-          op: "subscript",
-          container: object.name,
-          value: ["ans", null]
-        });
+        // a[Math.floor(b * 100 - 10)]
+        wrapJsSubscript(getTripleProp(object), getTripleProp(_node.property));
       }
     } else if (_node.property.type in LITERAL_TYPES) {
       if (_node.property.name === "length") {
@@ -1574,6 +1567,10 @@ function ast2asc(ast, js) {
     for (const subNode of _node.body.body) {
       process(subNode);
     }
+    if (shouldInit) {
+      // Update before test
+      process(_node.update);
+    }
     if (_node.test && shouldAddManualBreak) {
       ans.push({
         op: "if",
@@ -1585,10 +1582,6 @@ function ast2asc(ast, js) {
       ans.push({
         op: "end"
       });
-    }
-    if (shouldInit) {
-      // Update
-      process(_node.update);
     }
     ans.push({
       op: "end"
