@@ -518,6 +518,20 @@ function ast2asc(ast, js) {
 
   function breakWhenTestIsFalse(test) {
     const v = getTripleProp(test);
+    if (v[0] === 'bool') {
+      if (v[1]) {
+        // <del> if (!true) {break} </del>
+        return;
+      } else {
+        // <del> if (!false) </del> break
+        ans.push({
+          op: 'break'
+        });
+      }
+
+      return;
+    }
+
     ans.push({
       op: 'if',
       test: [
@@ -723,7 +737,6 @@ function ast2asc(ast, js) {
    *
    * 1. It will create necessary function
    * 2. Invoke the function
-   * 3. Return the output of it
    *
    * @param {*} _node
    */
@@ -1026,9 +1039,8 @@ function ast2asc(ast, js) {
       throw new Error(`AssertError: line ${_node.loc.start.line}, col ${_node.loc.start.column};
     \t"${errorSnippet}"
     \t${msg}
-    This is weird 😣. If you see this message, it means the tests haven't cover this kinda cases. 
-    Please submit an issue to let me know!
-    https://github.com/zxch3n/wenyanizer
+    This is weird 😣. If you see this message, it means our tests haven't covered this case. 
+    Please submit an issue to help us fix it! https://github.com/zxch3n/wenyanizer/issues/new
     `);
     }
   }
