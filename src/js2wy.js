@@ -1,17 +1,17 @@
 const { parse } = require("@babel/parser");
 const { asc2wy } = require("./asc2wy");
 const { getRandomChineseName, LAMBDA } = require("./utils");
-const GLOBAL_OBJECTS = [
-  "String",
-  "document",
-  "global",
-  "window",
-  "Math",
-  "Object",
-  "JSON",
-  "Array",
-  "Number",
-];
+// const GLOBAL_OBJECTS = [
+//   "String",
+//   "document",
+//   "global",
+//   "window",
+//   "Math",
+//   "Object",
+//   "JSON",
+//   "Array",
+//   "Number",
+// ];
 
 //  Function names:
 //
@@ -349,7 +349,7 @@ function ast2asc(ast, js) {
   const nodes = ast.program.body;
   const NEW_SIGNATURE = "JS_NEW()";
   const NEW_FUNC_NAME = "造物";
-  const INDEX_SIGNATURE = "JS_INDEX()";
+  // const INDEX_SIGNATURE = "JS_INDEX()";
   const INDEX_FUNC = "求索";
   const INDEX_ASSIGN_SIGNATURE = "JS_INDEX_ASSIGN()";
   const INDEX_ASSIGN_FUNC = "賦值";
@@ -727,7 +727,7 @@ function ast2asc(ast, js) {
    *
    * @param {*} _node
    */
-  function wrapJsGlobalFunction(_node, global=false) {
+  function wrapJsGlobalFunction(_node) {
     // FIXME: it also wrap function call on rhs
     assert(_node.type === "CallExpression");
     let signature = "";
@@ -836,21 +836,21 @@ function ast2asc(ast, js) {
     });
   }
 
-  function wrapJsIndexing(_node) {
-    wrapJsNativeFunction(
-      INDEX_SIGNATURE,
-      INDEX_FUNC,
-      [{ type: "obj", name: "道" }],
-      "typeof 道 === 'string'? 道 : 道 + 1"
-    );
+  // function wrapJsIndexing(_node) {
+  //   wrapJsNativeFunction(
+  //     INDEX_SIGNATURE,
+  //     INDEX_FUNC,
+  //     [{ type: "obj", name: "道" }],
+  //     "typeof 道 === 'string'? 道 : 道 + 1"
+  //   );
 
-    ans.push({
-      op: "call",
-      fun: INDEX_FUNC,
-      args: [getTripleProp(_node)],
-      pos: _node.start
-    });
-  }
+  //   ans.push({
+  //     op: "call",
+  //     fun: INDEX_FUNC,
+  //     args: [getTripleProp(_node)],
+  //     pos: _node.start
+  //   });
+  // }
 
   function wrapJsSubscript(obj, field) {
     wrapJsNativeFunction(

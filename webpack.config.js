@@ -7,7 +7,7 @@ module.exports = {
   },
   output: {
     globalObject: '(typeof self !== "undefined" ? self : this)', // make it works for both node and browser
-    libraryTarget: "umd2",
+    libraryTarget: "umd",
     library: 'wenyanizer',
     path: path.resolve(__dirname, "dist"),
     filename: "[name].js"
@@ -16,6 +16,5 @@ module.exports = {
     extensions: ['.js', '.ts']
   },
   mode: 'production',
-  // removing this may make front-end work?
-  // externals: [nodeExternals()]
+  externals: [nodeExternals()]
 };

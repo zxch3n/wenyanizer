@@ -5,7 +5,6 @@
  * 2. {op: "op", ...} may include another field called `name`, indicating the the assignment target
  *
  */
-const parser = require("@babel/parser");
 const { num2hanzi } = require("./hanzi2num");
 //「」
 
@@ -41,27 +40,9 @@ const TYPES = {
 };
 
 var tmpVarCnt = 0;
-var randVarCnt = 0;
-function randVar() {
-  randVarCnt++;
-  return "_rand" + randVarCnt;
-}
-function currTmpVar() {
-  return "_ans" + tmpVarCnt;
-}
 function nextTmpVar() {
   tmpVarCnt++;
   return "_ans" + tmpVarCnt;
-}
-
-function prevTmpVar(n) {
-  return "_ans" + (tmpVarCnt - n + 1);
-}
-
-function assert(cond, error) {
-  if (!cond) {
-    console.log(error);
-  }
 }
 
 function getType(type) {
