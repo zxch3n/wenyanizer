@@ -151,11 +151,11 @@ var 乙 = 100 * 200 + 35 * (48 - 10) * 甲;
 
 # Hacks
 
-Restricted by current Wenyan grammar, some hacks are required to make this compiler work. When you use grammar that is not well supported by Wenyan, there will be a bunch of functions being added to the top of compiled file.
+Restricted by current Wenyan grammar, some hacks are required to make this compiler work. When you use grammar that is not well supported by Wenyan, there will be a bunch of functions being added to the top of the compiled file.
 
- Wenyan is still evolving fast, thanks to the devoted author and the great community. We may not need hack anymore very soon.
+Wenyan is still evolving fast, thanks to the devoted author and the great community. We may not need to hack anymore very soon.
 
- You can check the full list of polyfill in [HACKS.md](./doc/HACKS.md).
+You can check the full list of polyfills in [HACKS.md](./doc/HACKS.md).
 
 # Roadmap
 
