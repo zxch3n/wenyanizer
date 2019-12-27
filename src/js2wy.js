@@ -414,7 +414,7 @@ function ast2asc(ast, js) {
           breakWhenTestIsFalse(_node.test);
         }
 
-        processNodesAndPostProcess(_node.body.body);
+        processNodesAndHandlePostProcess(_node.body.body);
 
         if (_node.type === "DoWhileStatement") {
           breakWhenTestIsFalse(_node.test);
@@ -428,7 +428,7 @@ function ast2asc(ast, js) {
         addIfTestExpression(_node);
 
         if (_node.consequent.body) {
-          processNodesAndPostProcess(_node.consequent.body);
+          processNodesAndHandlePostProcess(_node.consequent.body);
         } else {
           process(_node.consequent);
         }
@@ -438,7 +438,7 @@ function ast2asc(ast, js) {
             op: "else"
           });
           if (_node.alternate.body) {
-            processNodesAndPostProcess(_node.alternate.body);
+            processNodesAndHandlePostProcess(_node.alternate.body);
           } else {
             process(_node.alternate);
           }
@@ -485,7 +485,7 @@ function ast2asc(ast, js) {
           iterator: getTripleProp(_node.left, false)[1]
         });
 
-        processNodesAndPostProcess(_node.body.body);
+        processNodesAndHandlePostProcess(_node.body.body);
         ans.push({
           op: "end"
         });
@@ -511,7 +511,7 @@ function ast2asc(ast, js) {
         wrapJsNewExpression(_node);
         break;
       case "SequenceExpression":
-        processNodesAndPostProcess(_node.expressions);
+        processNodesAndHandlePostProcess(_node.expressions);
         break;
       case "AssignmentExpression":
         handleAssignmentExpression(_node);
@@ -713,10 +713,7 @@ function ast2asc(ast, js) {
       }
     } else if (_node.type in LITERAL_TYPES) {
       return [getTripleProp(_node, false)];
-    } else if (
-      _node.type === "BinaryExpression" ||
-      _node.type === "LogicalExpression"
-    ) {
+    } else if ( _node.type.endsWith("Expression")) {
       return [getTripleProp(_node, false)];
     } else {
       notImpErr(_node);
@@ -1019,6 +1016,11 @@ function ast2asc(ast, js) {
       return getTripleProp(_node.argument);
     }
 
+    if (_node.type === 'AssignmentExpression') {
+      handleAssignmentExpression(_node);
+      return getTripleProp(_node.left)
+    }
+
     tryTurnThisExpressionToIdentifier(_node);
     if (!(_node.type in LITERAL_TYPES)) {
       notImpErr(_node);
@@ -1106,7 +1108,7 @@ function ast2asc(ast, js) {
       op: "funbody",
       pos: funcNode.start
     });
-    processNodesAndPostProcess(funcNode.body.body);
+    processNodesAndHandlePostProcess(funcNode.body.body);
     ans.push({
       op: "funend",
       pos: funcNode.end
@@ -1632,7 +1634,7 @@ function ast2asc(ast, js) {
   function handleForStatement(_node) {
     let initName = '';
     let _isReassigned = false;
-    if (_node.init.declarations) {
+    if (_node.init && _node.init.declarations) {
       for (const dec of _node.init.declarations) {
         initName = dec.id.name;
         if (isReassigned(dec.id.name, _node.body)) {
@@ -1646,6 +1648,7 @@ function ast2asc(ast, js) {
     let shouldAddManualBreak =
       _isReassigned ||
       !_node.init ||
+      !_node.init.declarations ||
       !_node.init.declarations.length ||
       _node.init.declarations[0].init.value !== 0 ||
       !_node.update ||
@@ -1655,6 +1658,7 @@ function ast2asc(ast, js) {
         (_node.test.left.name !== initName ||
           _node.test.operator !== "<" ||
           !(_node.test.right.type in LITERAL_TYPES)));
+
     const shouldInit =
       shouldAddManualBreak ||
       (_node.init &&
@@ -1662,8 +1666,8 @@ function ast2asc(ast, js) {
         _node.init.declarations[0] &&
         !_node.init.declarations[0].id.name.startsWith("_rand"));
 
-    if (shouldInit && _node.init.declarations) {
-      handleDeclaration(_node.init);
+    if (shouldInit && _node.init) {
+      process(_node.init);
     }
 
     if (shouldAddManualBreak) {
@@ -1685,8 +1689,8 @@ function ast2asc(ast, js) {
       breakWhenTestIsFalse(_node.test);
     }
 
-    processNodesAndPostProcess(_node.body.body);
-    if (shouldInit) {
+    processNodesAndHandlePostProcess(_node.body.body);
+    if (shouldInit && _node.update) {
       // Update before break test
       process(_node.update);
     }
@@ -1697,7 +1701,7 @@ function ast2asc(ast, js) {
     });
   }
 
-  function processNodesAndPostProcess(body) {
+  function processNodesAndHandlePostProcess(body) {
     for (const subNode of body) {
       consumePostProcess();
       process(subNode);
