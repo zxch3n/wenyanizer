@@ -62,12 +62,21 @@ js2wy("while(true){console.log('学习')}")
 
 
 
-# [Play Online](http://zxch3n.github.io/wenyanizer)
+## [Play Online](http://zxch3n.github.io/wenyanizer)
 
 
 <p align="center">
   <a href="http://zxch3n.github.io/wenyanizer"><img src="https://i.postimg.cc/QC4ymZ1z/image.png"/></a>
 </p>
+
+## [VSCode Plugin](https://github.com/antfu/wenyan-lang-vscode) by [antfu](https://github.com/antfu)
+
+You can use Wenyanizer in Wenyan Lang VSCode plugin now.
+
+<p align="center">
+  <a href="http://zxch3n.github.io/wenyanizer"><img src="https://i.postimg.cc/tCg3RP18/image.png"/></a>
+</p>
+
 
 # Examples
 
