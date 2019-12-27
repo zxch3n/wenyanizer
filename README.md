@@ -74,7 +74,7 @@ js2wy("while(true){console.log('学习')}")
 You can use Wenyanizer in Wenyan Lang VSCode plugin now.
 
 <p align="center">
-  <a href="http://zxch3n.github.io/wenyanizer"><img src="https://i.postimg.cc/tCg3RP18/image.png"/></a>
+  <a href="https://github.com/antfu/wenyan-lang-vscode"><img src="https://i.postimg.cc/tCg3RP18/image.png"/></a>
 </p>
 
 
