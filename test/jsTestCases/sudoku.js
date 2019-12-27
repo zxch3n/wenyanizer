@@ -9,7 +9,7 @@ function sudoku(board, x, y) {
     return sudoku(board, next.x, next.y);
   }
 
-  for (let k = "1"; k < "10"; k++) {
+  for (let k = 1; k < 10; k++) {
     if (isValidVal(board, x, y, k.toString())) {
       board[x][y] = k.toString();
 

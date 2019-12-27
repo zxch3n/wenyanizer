@@ -188,8 +188,8 @@ const LITERALS = {
 
 const COMPARE_OPERATORS = ["!=", "==", ">=", "<=", "<", ">", "===", "!=="];
 const OPERATORS = [
-  '===',
-  '!==',
+  "===",
+  "!==",
   "!=",
   "==",
   ">=",
@@ -267,6 +267,12 @@ function getNamesOnlyUsedOnce(body) {
   return ans;
 }
 
+/**
+ * Return whether a variable is reassigned in an expression or a statement
+ *
+ * @param {name of a variable} name
+ * @param {the node where the variable might be reassigned} node
+ */
 function isReassigned(name, node) {
   if (!node || typeof node !== "object") {
     return false;
@@ -356,10 +362,10 @@ function ast2asc(ast, js) {
   const JS_SUBSCRIPT = "JsSubscript()";
   const JS_SUBSCRIPT_FUN = "獲取";
   varSet = new Map();
-  varSet.set(NEW_FUNC_NAME, 1)
-  varSet.set(INDEX_FUNC, 1)
-  varSet.set(INDEX_ASSIGN_FUNC, 1)
-  varSet.set(JS_SUBSCRIPT_FUN, 1)
+  varSet.set(NEW_FUNC_NAME, 1);
+  varSet.set(INDEX_FUNC, 1);
+  varSet.set(INDEX_ASSIGN_FUNC, 1);
+  varSet.set(JS_SUBSCRIPT_FUN, 1);
   let postProcess = []; // handle a++
   let ans = [];
   const polyfillAns = [];
@@ -378,8 +384,7 @@ function ast2asc(ast, js) {
 
   return ans;
 
-
-  function consumePostProcess(){
+  function consumePostProcess() {
     for (var func of postProcess) {
       func();
     }
@@ -405,13 +410,13 @@ function ast2asc(ast, js) {
           op: "whiletrue"
         });
 
-        if (_node.type === 'WhileStatement'){
+        if (_node.type === "WhileStatement") {
           breakWhenTestIsFalse(_node.test);
         }
 
-        processAllNodesInBody(_node.body.body);
+        processNodesAndPostProcess(_node.body.body);
 
-        if (_node.type === 'DoWhileStatement') {
+        if (_node.type === "DoWhileStatement") {
           breakWhenTestIsFalse(_node.test);
         }
 
@@ -423,7 +428,7 @@ function ast2asc(ast, js) {
         addIfTestExpression(_node);
 
         if (_node.consequent.body) {
-          processAllNodesInBody(_node.consequent.body);
+          processNodesAndPostProcess(_node.consequent.body);
         } else {
           process(_node.consequent);
         }
@@ -433,7 +438,7 @@ function ast2asc(ast, js) {
             op: "else"
           });
           if (_node.alternate.body) {
-            processAllNodesInBody(_node.alternate.body);
+            processNodesAndPostProcess(_node.alternate.body);
           } else {
             process(_node.alternate);
           }
@@ -480,7 +485,7 @@ function ast2asc(ast, js) {
           iterator: getTripleProp(_node.left, false)[1]
         });
 
-        processAllNodesInBody(_node.body.body);
+        processNodesAndPostProcess(_node.body.body);
         ans.push({
           op: "end"
         });
@@ -492,11 +497,7 @@ function ast2asc(ast, js) {
         handleArrayExpression(_node);
         break;
       case "UnaryExpression":
-        ans.push({
-          op: "not",
-          value: getTripleProp(_node.argument, true),
-          pos: _node.start
-        });
+        wrapUnaryExpression(_node);
         break;
       case "FunctionExpression": {
         wrapFunctionExpression(_node);
@@ -509,6 +510,12 @@ function ast2asc(ast, js) {
       case "NewExpression":
         wrapJsNewExpression(_node);
         break;
+      case "SequenceExpression":
+        processNodesAndPostProcess(_node.expressions);
+        break;
+      case "AssignmentExpression":
+        handleAssignmentExpression(_node);
+        break;
       case "EmptyStatement":
         break;
       default:
@@ -516,16 +523,37 @@ function ast2asc(ast, js) {
     }
   }
 
+  function wrapUnaryExpression(_node) {
+    if (_node.operator === '!') {
+      ans.push({
+        op: "not",
+        value: getTripleProp(_node.argument, true),
+        pos: _node.start
+      });
+    }
+    else if (_node.operator === '-') {
+      ans.push({
+        op: 'op-',
+        lhs: ['num', 0, _node.start],
+        rhs: getTripleProp(_node.argument, true),
+        pos: _node.start
+      });
+    }
+    else {
+      notImpErr();
+    }
+  }
+
   function breakWhenTestIsFalse(test) {
     const v = getTripleProp(test);
-    if (v[0] === 'bool') {
+    if (v[0] === "bool") {
       if (v[1]) {
         // <del> if (!true) {break} </del>
         return;
       } else {
         // <del> if (!false) </del> break
         ans.push({
-          op: 'break'
+          op: "break"
         });
       }
 
@@ -533,18 +561,14 @@ function ast2asc(ast, js) {
     }
 
     ans.push({
-      op: 'if',
-      test: [
-        v,
-        ['cmp', '=='],
-        ['num', 0]
-      ]
+      op: "if",
+      test: [v, ["cmp", "=="], ["num", 0]]
     });
     ans.push({
-      op: 'break'
+      op: "break"
     });
     ans.push({
-      op: 'end'
+      op: "end"
     });
   }
 
@@ -685,7 +709,7 @@ function ast2asc(ast, js) {
           getTripleProp(_node.property.left, false)
         ];
       } else {
-        return [getTripleProp(_node, false)]
+        return [getTripleProp(_node, false)];
       }
     } else if (_node.type in LITERAL_TYPES) {
       return [getTripleProp(_node, false)];
@@ -990,7 +1014,7 @@ function ast2asc(ast, js) {
       }
     }
 
-    if (_node.type === 'UpdateExpression') {
+    if (_node.type === "UpdateExpression") {
       handleUpdateExpression(_node);
       return getTripleProp(_node.argument);
     }
@@ -1082,15 +1106,15 @@ function ast2asc(ast, js) {
       op: "funbody",
       pos: funcNode.start
     });
-    processAllNodesInBody(funcNode.body.body);
+    processNodesAndPostProcess(funcNode.body.body);
     ans.push({
       op: "funend",
       pos: funcNode.end
     });
     // clear the stack
     ans.push({
-      op: 'discard'
-    })
+      op: "discard"
+    });
   }
 
   function createTempVarToWrap(values, type = undefined, names = []) {
@@ -1111,10 +1135,10 @@ function ast2asc(ast, js) {
     if (test.type === "BinaryExpression") {
       if (COMPARE_OPERATORS.includes(test.operator)) {
         return [
-            ...getIfProp(test.left),
-            ["cmp", test.operator],
-            ...getIfProp(test.right)
-        ]
+          ...getIfProp(test.left),
+          ["cmp", test.operator],
+          ...getIfProp(test.right)
+        ];
       } else if (test in LITERAL_TYPES) {
         return [getTripleProp(test, false)];
       } else {
@@ -1128,7 +1152,7 @@ function ast2asc(ast, js) {
       test.type === "UnaryExpression"
     ) {
       return [getTripleProp(test, false)];
-    } else if (test.type === 'CallExpression') {
+    } else if (test.type === "CallExpression") {
       // FIXME: unsure
       return [getTripleProp(test, false)];
     } else {
@@ -1140,10 +1164,10 @@ function ast2asc(ast, js) {
 
   function addIfTestExpression(_node) {
     ans.push({
-      op: 'if',
+      op: "if",
       test: getTest(_node.test),
       pos: _node.start
-    })
+    });
   }
 
   function handleExpressionStatement(_node) {
@@ -1166,28 +1190,28 @@ function ast2asc(ast, js) {
   }
 
   function handleUpdateExpressionImmediately(_node) {
-    assertStrongly(_node.operator === '++' || _node.operator === '--', _node);
-    if (_node.argument.type === 'MemberExpression') {
+    assertStrongly(_node.operator === "++" || _node.operator === "--", _node);
+    if (_node.argument.type === "MemberExpression") {
       handleAssignWithLhsMemberExpression({
-          ..._node,
+        ..._node,
         left: _node.argument,
         right: {
           ..._node,
-          type: 'BinaryExpression',
+          type: "BinaryExpression",
           operator: _node.operator[0],
           left: _node.argument,
           right: {
             ..._node,
             type: "NumericLiteral",
-            value: 1,
+            value: 1
           }
         },
         type: "AssignmentExpression"
-      })
+      });
       return;
     }
 
-    assertStrongly(_node.argument.type === 'Identifier', _node);
+    assertStrongly(_node.argument.type === "Identifier", _node);
     ans.push({
       op: "op" + _node.operator[0],
       lhs: ["iden", _node.argument.name],
@@ -1211,9 +1235,9 @@ function ast2asc(ast, js) {
     if (_node.prefix) {
       handleUpdateExpressionImmediately(_node);
     } else {
-      postProcess.push(()=>{
+      postProcess.push(() => {
         handleUpdateExpressionImmediately(_node);
-      })
+      });
     }
   }
 
@@ -1319,13 +1343,13 @@ function ast2asc(ast, js) {
       // if op in {+=, -=, *=, ...}
       assertStrongly(_node.operator[1] === "=", _node);
       _node.right = {
-        type: 'BinaryExpression',
+        type: "BinaryExpression",
         operator: _node.operator[0],
         left: _node.left,
         right: _node.right
-      }
+      };
 
-      _node.operator = '=';
+      _node.operator = "=";
     }
 
     assertStrongly(_node.operator === "=", _node);
@@ -1545,9 +1569,9 @@ function ast2asc(ast, js) {
     }
 
     tryTurnThisExpressionToIdentifier(object);
-    assertStrongly(object.type === 'Identifier', _node, )
-    if (_node.property.type.endsWith('Expression')) {
-      if ( _node.property.operator === "-" && _node.property.right.value === 1) {
+    assertStrongly(object.type === "Identifier", _node);
+    if (_node.property.type.endsWith("Expression")) {
+      if (_node.property.operator === "-" && _node.property.right.value === 1) {
         // a[b - 1]
         ans.push({
           op: "subscript",
@@ -1606,9 +1630,21 @@ function ast2asc(ast, js) {
   }
 
   function handleForStatement(_node) {
-    const initName = _node.init.declarations[0].id.name;
+    let initName = '';
+    let _isReassigned = false;
+    if (_node.init.declarations) {
+      for (const dec of _node.init.declarations) {
+        initName = dec.id.name;
+        if (isReassigned(dec.id.name, _node.body)) {
+          _isReassigned = true;
+          break;
+        }
+      }
+    }
+
     // whether it is in the format of `for (let i = 0; i < n; i++)`
     let shouldAddManualBreak =
+      _isReassigned ||
       !_node.init ||
       !_node.init.declarations.length ||
       _node.init.declarations[0].init.value !== 0 ||
@@ -1618,17 +1654,18 @@ function ast2asc(ast, js) {
       (_node.test &&
         (_node.test.left.name !== initName ||
           _node.test.operator !== "<" ||
-          !(_node.test.right.type in LITERAL_TYPES))) ||
-      isReassigned(initName, _node.body);
+          !(_node.test.right.type in LITERAL_TYPES)));
     const shouldInit =
       shouldAddManualBreak ||
       (_node.init &&
         _node.init.declarations &&
         _node.init.declarations[0] &&
         !_node.init.declarations[0].id.name.startsWith("_rand"));
-    if (shouldInit) {
-      appendDeclaration("num", _node.init.declarations[0].init.value, initName);
+
+    if (shouldInit && _node.init.declarations) {
+      handleDeclaration(_node.init);
     }
+
     if (shouldAddManualBreak) {
       ans.push({
         op: "whiletrue"
@@ -1642,36 +1679,30 @@ function ast2asc(ast, js) {
     } else {
       notImpErr(_node);
     }
-    processAllNodesInBody(_node.body.body);
+
+    // Test whether should break
+    if (_node.test && shouldAddManualBreak) {
+      breakWhenTestIsFalse(_node.test);
+    }
+
+    processNodesAndPostProcess(_node.body.body);
     if (shouldInit) {
       // Update before break test
       process(_node.update);
     }
     // update i++ immediately
     consumePostProcess();
-    if (_node.test && shouldAddManualBreak) {
-      ans.push({
-        op: "if",
-        test: [getTripleProp(_node.test), ["cmp", "=="], ["bool", false]]
-      });
-      ans.push({
-        op: "break"
-      });
-      ans.push({
-        op: "end"
-      });
-    }
     ans.push({
       op: "end"
     });
   }
 
-  function processAllNodesInBody(body) {
+  function processNodesAndPostProcess(body) {
     for (const subNode of body) {
       consumePostProcess();
       process(subNode);
     }
-    
+
     consumePostProcess();
   }
 }
