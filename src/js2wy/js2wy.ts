@@ -1,6 +1,4 @@
-// @ts-ignore
 import { parse } from "@babel/parser";
-// @ts-ignore
 import { File } from "@babel/types";
 import { asc2wy } from "../asc2wy";
 import { ast2asc as _ast2asc } from './ast2asc';
