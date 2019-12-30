@@ -20,7 +20,7 @@
     "index.d.ts"
   ],
   "scripts": {
-    "test": "nyc --reporter=lcov mocha",
+    "test": "nyc --reporter=lcov ts-mocha",
     "build": "webpack"
   },
   "license": "MIT",
@@ -36,7 +36,8 @@
     "webpack-node-externals": "^1.7.2"
   },
   "dependencies": {
-    "@babel/parser": "^7.7.7"
+    "@babel/parser": "^7.7.7",
+    "ts-mocha": "^6.0.0"
   },
   "nyc": {
     "include": "src"
