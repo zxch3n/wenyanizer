@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* istanbul ignore file */
 var NUMS = ["零","一","二","三","四","五","六","七","八","九"]
 var MULTS1 = ["十","百","千"];

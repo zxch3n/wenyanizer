@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* istanbul ignore file */
 try {
   var fs = require("fs");

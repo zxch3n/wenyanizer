@@ -1,4 +1,4 @@
-function ascPostProcess(asc) {
+export function ascPostProcess(asc) {
     function getIdenOnlyUsedOnce() {
         const count = {};
         function add(name) {
@@ -72,5 +72,3 @@ function ascPostProcess(asc) {
     }
 }
 
-
-module.exports.ascPostProcess = ascPostProcess;

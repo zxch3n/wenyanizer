@@ -15,14 +15,14 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.tsx?$/,
+        test: [/\.ts$/, /\.js$/],
         use: 'ts-loader',
         exclude: /node_modules/,
       },
     ],
   },
   resolve: {
-    extensions: ['.js', '.ts']
+    extensions: ['.ts', '.js']
   },
   mode: 'production',
   externals: [nodeExternals()]
