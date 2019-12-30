@@ -11,3 +11,4 @@ dist/
 .nyc_output/
 yarn-error.log
 coverage/
+build/

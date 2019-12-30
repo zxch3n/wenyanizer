@@ -1,3 +1,4 @@
+// @ts-nocheck
 function removeDataSuffix(node) {
   if (!(node instanceof Array) || node[0] !== "data") {
     return;

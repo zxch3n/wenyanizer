@@ -1,3 +1,4 @@
+// @ts-nocheck
 var fs = require("fs");
 var assert = require("assert");
 var path = require("path");

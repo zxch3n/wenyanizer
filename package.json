@@ -20,27 +20,42 @@
     "index.d.ts"
   ],
   "scripts": {
-    "test": "nyc --reporter=lcov ts-mocha",
+    "test": "mocha",
     "build": "webpack"
+  },
+  "nyc": {
+    "extension": [
+      ".js",
+      ".ts",
+      ".tsx"
+    ],
+    "exclude": [
+      "**/*.d.ts"
+    ],
+    "reporter": [
+      "lcov"
+    ],
+    "include": "src",
+    "all": true
   },
   "license": "MIT",
   "devDependencies": {
+    "@babel/types": "^7.7.4",
+    "@istanbuljs/nyc-config-typescript": "^1.0.0",
+    "@types/mocha": "^5.2.7",
     "eslint": "^6.8.0",
     "mocha": "^6.2.2",
     "nyc": "^15.0.0",
+    "source-map-support": "^0.5.16",
     "ts-loader": "^6.2.1",
+    "ts-mocha": "^6.0.0",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.4",
     "webpack": "^4.41.4",
     "webpack-cli": "^3.3.10",
-    "@babel/types": "^7.7.4",
-    "webpack-node-externals": "^1.7.2",
-    "ts-mocha": "^6.0.0"
+    "webpack-node-externals": "^1.7.2"
   },
   "dependencies": {
     "@babel/parser": "^7.7.7"
-  },
-  "nyc": {
-    "include": "src"
   }
 }
