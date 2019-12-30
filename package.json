@@ -4,7 +4,7 @@
   "keywords": [
     "wenyan"
   ],
-  "version": "0.2.7",
+  "version": "0.2.8",
   "main": "dist/index.js",
   "typings": "./index.d.ts",
   "author": {

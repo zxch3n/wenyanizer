@@ -714,7 +714,7 @@ export function ast2asc(ast, js) {
         }
 
         if (_node.type === "StringLiteral") {
-            if (_node.value) {
+            if (_node.value != null) {
                 return ["lit", `"${_node.value}"`, _node.start];
             }
 
