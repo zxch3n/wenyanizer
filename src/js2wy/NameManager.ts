@@ -3,8 +3,10 @@ const NUMS = ["零","一","二","三","四","五","六","七","八","九"];
 
 export class NameManager {
     map: Map<string, string>;
-    constructor() {
+    namesOnlyUsedOnce: Set<string>;
+    constructor(ast: any) {
         this.map = new Map();
+        this.namesOnlyUsedOnce = getNamesOnlyUsedOnce(ast.program.body);
     }
 
     registerName(name, type="") {
@@ -22,7 +24,7 @@ export class NameManager {
 
     getNextTmpName(type='') {
         const name = this.generateRandomName();
-        this.registerName(name, type)
+        this.registerName(name, type);
         return name;
     }
 
@@ -34,3 +36,56 @@ export class NameManager {
         return this.map.get(name);
     }
 }
+
+export function getNamesOnlyUsedOnce(body): Set<string> {
+    const counter = {};
+
+    function count(v) {
+        if (v in counter) {
+            counter[v] += 1;
+        } else {
+            counter[v] = 1;
+        }
+    }
+
+    function _get(node, insideTest = false) {
+        if (!node || typeof node !== "object") {
+            return;
+        }
+
+        if (node.type === "Identifier") {
+            count(node.name);
+            if (insideTest) {
+                count(node.name);
+                count(node.name);
+            }
+            return;
+        }
+
+        if (node instanceof Array) {
+            for (const subNode of node) {
+                _get(subNode, insideTest);
+            }
+
+            return;
+        }
+
+        for (const key in node) {
+            const v =
+                insideTest || key === "test" || key === "arguments" || key === "update";
+            // (key === "right" && node.type === "ForOfStatement");
+            _get(node[key], v);
+        }
+    }
+
+    _get(body);
+    const ans = new Set<string>();
+    for (const key in counter) {
+        if (counter[key] === 2) {
+            ans.add(key);
+        }
+    }
+
+    return ans;
+}
+

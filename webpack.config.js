@@ -3,7 +3,7 @@ const nodeExternals = require('webpack-node-externals');
 
 module.exports = {
   entry: {
-    index: "./src/js2wy/js2wy.js"
+    index: "./src/js2wy/js2wy.ts"
   },
   output: {
     globalObject: '(typeof self !== "undefined" ? self : this)', // make it works for both node and browser

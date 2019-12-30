@@ -1,7 +1,10 @@
-const { parse } = require("@babel/parser");
-const { asc2wy } = require("../asc2wy");
-const { ast2asc } = require('./ast2asc');
-const { ascPostProcess } = require('./ascPostProcess');
+// @ts-ignore
+import { parse } from "@babel/parser";
+// @ts-ignore
+import { File } from "@babel/types";
+import { asc2wy } from "../asc2wy";
+import { ast2asc as _ast2asc } from './ast2asc';
+import { ascPostProcess } from './ascPostProcess';
 // const GLOBAL_OBJECTS = [
 //   "String",
 //   "document",
@@ -20,13 +23,13 @@ const { ascPostProcess } = require('./ascPostProcess');
 //    use wrapXxxExpression as the function name when one will push the output to the stack
 //    use consumeXxxExpression when it will consume the stack
 
-function js2wy(jsStr) {
+export function js2wy(jsStr) {
   const asc = js2asc(jsStr);
   return asc2wy(asc);
 }
 
-function js2asc(jsStr) {
-  var jsAst, asc;
+export function js2asc(jsStr) {
+  let jsAst: File, asc;
   try {
     jsAst = parse(jsStr);
   } catch (e) {
@@ -35,7 +38,7 @@ function js2asc(jsStr) {
   }
 
   try {
-    asc = ast2asc(jsAst, jsStr);
+    asc = _ast2asc(jsAst, jsStr);
   } catch (e) {
     e.message = "[Ast2asc Error] " + e.message;
     throw e;
@@ -52,6 +55,4 @@ function js2asc(jsStr) {
 }
 
 
-module.exports.js2wy = js2wy;
-module.exports.ast2asc = ast2asc;
-module.exports.js2asc = js2asc;
+export const ast2asc = _ast2asc;

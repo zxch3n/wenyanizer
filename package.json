@@ -33,11 +33,12 @@
     "typescript": "^3.7.4",
     "webpack": "^4.41.4",
     "webpack-cli": "^3.3.10",
-    "webpack-node-externals": "^1.7.2"
+    "@babel/types": "^7.7.4",
+    "webpack-node-externals": "^1.7.2",
+    "ts-mocha": "^6.0.0"
   },
   "dependencies": {
-    "@babel/parser": "^7.7.7",
-    "ts-mocha": "^6.0.0"
+    "@babel/parser": "^7.7.7"
   },
   "nyc": {
     "include": "src"
