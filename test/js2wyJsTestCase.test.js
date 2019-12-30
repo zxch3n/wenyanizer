@@ -2,7 +2,7 @@ var assert = require("assert");
 var path = require("path");
 var fs = require("fs");
 var parser = require("../src/parser");
-var { js2wy, js2asc } = require("../src/js2wy");
+var { js2wy, js2asc } = require("../src/js2wy/js2wy");
 const logDir = path.join(__dirname, "log");
 try {
   fs.mkdirSync(logDir);

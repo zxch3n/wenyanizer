@@ -3,7 +3,7 @@ const nodeExternals = require('webpack-node-externals');
 
 module.exports = {
   entry: {
-    index: "./src/js2wy.js"
+    index: "./src/js2wy/js2wy.js"
   },
   output: {
     globalObject: '(typeof self !== "undefined" ? self : this)', // make it works for both node and browser
@@ -11,6 +11,15 @@ module.exports = {
     library: 'wenyanizer',
     path: path.resolve(__dirname, "dist"),
     filename: "[name].js"
+  },
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        use: 'ts-loader',
+        exclude: /node_modules/,
+      },
+    ],
   },
   resolve: {
     extensions: ['.js', '.ts']
