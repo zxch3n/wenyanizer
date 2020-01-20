@@ -2,11 +2,19 @@
 var assert = require("assert");
 var path = require("path");
 var fs = require("fs");
-var parser = require("../src/parser");
 var { js2wy, js2asc } = require("../src/js2wy/js2wy");
 var { removeField } = require("./utils");
 const logDir = path.join(__dirname, 'log');
 try{fs.mkdirSync(logDir);}catch(e){}
+var parser = require("@wenyanlang/core");
+function wy2asc(txt) {
+  function ass(msg, pos, b) {
+    if (!b) console.error(`ERROR@${pos}: ${msg}`);
+  }
+
+  const tokens = parser.wy2tokens(txt, ass);
+  return parser.tokens2asc(tokens, ass);
+}
 
 const _log = console.log;
 function runExample(name) {
@@ -14,9 +22,9 @@ function runExample(name) {
   var txt = fs
     .readFileSync(filepath)
     .toString();
-  var asc = parser.wy2asc(txt, () => {}).asc;
-  var js = parser.compile("js", txt, {
-    romanizeIdentifiers: true,
+  var asc = wy2asc(txt, () => {});
+  var js = parser.compile(txt, {
+    romanizeIdentifiers: 'pinyin',
     logCallback: () => {},
     errorCallback: err => {
       console.trace(err);
@@ -51,8 +59,8 @@ function runExample(name) {
   //   encoding: "utf-8"
   // });
   const generatedWy = js2wy(js);
-  const generatedJs = parser.compile("js", generatedWy, {
-    romanizeIdentifiers: true,
+  const generatedJs = parser.compile(generatedWy, {
+    strict: false,
     logCallback: () => {},
     errorCallback: err => {
       console.trace(err);

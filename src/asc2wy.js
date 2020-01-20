@@ -71,11 +71,11 @@ function getValue(prop) {
   } else if (prop[0] === "lit") {
     return `「「${prop[1].slice(1, -1)}」」`;
   } else if (prop[0] === "bool") {
-    if (prop[1]) {
-      return "陽";
+    if (!prop[1] || prop[1] === 'false') {
+      return "陰";
     }
 
-    return "陰";
+    return "陽";
   } else if (prop[0] === "data") {
     if (prop[1][prop[1].length - 1] === "\n") {
       return ` ${prop[1].slice(0, -1)}`;
@@ -123,6 +123,7 @@ function asc2wy(asc) {
   let i = 0;
   let indent = 0;
   const funcNames = [];
+  const objNames = [];
 
   function addIndent() {
     for (let j = 0; j < indent; j++) {
@@ -146,7 +147,7 @@ function asc2wy(asc) {
     }
 
     ans += `吾有${num2hanzi(n)}${type}。`;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; node.values.length !== 0 && i < n; i++) {
       if (node.values[i] != null) {
         ans += `曰${getValue(node.values[i])}。`;
       } else if (node.type === "num" && n > 1) {
@@ -169,6 +170,10 @@ function asc2wy(asc) {
 
     if (node.type === "fun") {
       funcNames.push(node.names[0]);
+    }
+
+    if (node.type === 'obj') {
+      objNames.push(node.names[0]);
     }
 
     ans += "\n";
@@ -324,7 +329,13 @@ function asc2wy(asc) {
         break;
       case "return":
         addIndent();
-        ans += `乃得 ${getValue(node.value)}\n`;
+        if (node.value == null) {
+          ans += '乃歸空無矣。\n';
+        } else if (node.value[0] === 'ans') {
+          ans += `乃得矣。\n`;
+        } else {
+          ans += `乃得 ${getValue(node.value)}。\n`;
+        }
         break;
       case "funend":
         indent--;
@@ -334,7 +345,7 @@ function asc2wy(asc) {
       case "push":
         if (node.values.length) {
           addIndent();
-          ans += `充「${node.container}」以${getValue(node.values[0])}。`;
+          ans += `充${getValue(node.container)}以${getValue(node.values[0])}。`;
           for (let i = 1; i < node.values.length; i++) {
             ans += `以${getValue(node.values[i])}。`;
           }
@@ -354,13 +365,29 @@ function asc2wy(asc) {
         } else {
           ans += `昔之${getValue(node.lhs)}者。`;
         }
-        ans += `今${getValue(node.rhs)}是矣。\n`;
+
+        if (node.rhs === undefined) {
+          ans += '今不復存矣。\n'
+        } else if (node.rhssubs === undefined) {
+          ans += `今${getValue(node.rhs)}是矣。\n`;
+        } else {
+          ans += `今${getValue(node.rhs)}之${getValue(node.rhssubs)}是矣。`;
+        }
         break;
       case "call":
-        addIndent();
-        ans += `施「${node.fun}」`;
-        for (let j = 0; j < node.args.length; j++) {
-          ans += `於${getValue(node.args[j])}。`;
+        if (node.args){
+          addIndent();
+        }
+
+        ans += `施${getValue(node.fun)}。`;
+        if (node.pop) {
+          for (let j = 0; node.args && j < node.args.length; j++) {
+            ans += `以${getValue(node.args[j])}。`;
+          }
+        } else {
+          for (let j = 0; node.args && j < node.args.length; j++) {
+            ans += `於${getValue(node.args[j])}。`;
+          }
         }
         ans += "\n";
         break;
@@ -370,7 +397,7 @@ function asc2wy(asc) {
         break;
       case "subscript":
         addIndent();
-        ans += `夫「${node.container}」之${getValue(node.value)}。\n`;
+        ans += `夫${getValue(node.container)}之${getValue(node.value)}。\n`;
         break;
       case "not":
         addIndent();
@@ -378,15 +405,15 @@ function asc2wy(asc) {
         break;
       case "cat":
         addIndent();
-        ans += `銜${wrapVar(node.containers[0])}`;
+        ans += `銜${getValue(node.containers[0])}`;
         for (let i = 1; i < node.containers.length; i++) {
-          ans += `以${wrapVar(node.containers[i])}`;
+          ans += `以${getValue(node.containers[i])}`;
         }
         ans += "。\n";
         break;
       case "for":
         addIndent();
-        ans += `凡${wrapVar(node.container)}中之${wrapVar(node.iterator)}\n`;
+        ans += `凡${getValue(node.container)}中之${wrapVar(node.iterator)}\n`;
         indent++;
         break;
       case "discard":
@@ -394,8 +421,84 @@ function asc2wy(asc) {
         break;
       case "length":
         addIndent();
-        ans += `夫${wrapVar(node.container)}之長。`;
+        ans += `夫${getValue(node.container)}之長。`;
         break;
+      case "import": {
+        addIndent();
+        const iden = node.iden.map(wrapVar).join('');
+        ans += `吾嘗觀「「${node.file.slice(1, -1)}」」之書。方悟${iden}之義。\n`;
+        break;
+      }
+      case "take": {
+        addIndent();
+        ans += `取${num2hanzi(node.count)}以`;
+        break;
+      }
+      case "objbody": {
+        addIndent();
+        ans += `其物如是。\n`;
+        indent++;
+        break;
+      }
+      case 'prop': {
+        addIndent();
+        ans += `物之「「${node.name.slice(1, -1)}」」者。`;
+        switch (node.value[0]) {
+          case 'num':
+          case 'iden':
+            ans += '數';
+            break;
+          case 'str':
+            ans += '言';
+            break;
+          default:
+            ans += '言';
+        }
+        ans += `曰${getValue(node.value)}\n`;
+        break;
+      }
+      case 'objend': {
+        indent--;
+        addIndent();
+        ans += `是謂${wrapVar(objNames.pop())}之物也。\n`;
+        break;
+      }
+      case 'temp': {
+        addIndent();
+        ans += `夫${getValue(node.iden)}。\n`;
+        break;
+      }
+      case 'try': {
+        addIndent();
+        ans += `姑妄行此。\n`;
+        indent++;
+        break;
+      }
+      case 'throw': {
+        addIndent();
+        ans += `嗚呼。${getValue(node.error)}之禍。\n`;
+        break;
+      }
+      case 'catch': {
+        addIndent();
+        ans += `如事不諧。\n`;
+        break;
+      }
+      case 'catcherr': {
+        addIndent();
+        if (node.error == null) {
+          ans += `不知何禍歟。\n`;
+        } else {
+          ans += `豈${getValue(node.error)}之禍歟。\n`;
+        }
+        break;
+      }
+      case 'tryend': {
+        indent--;
+        addIndent();
+        ans += `乃作罷。\n`;
+        break;
+      }
       default:
         console.log(node);
         throw new Error("NotImp");

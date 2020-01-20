@@ -30,13 +30,13 @@ export class ActionManager {
         this.nameManager = nameManager;
     }
 
-    addVar(names: string[], values: Value[], type: string) {
+    addVar(names: string[]|undefined, values: Value[]|undefined, type: string) {
         const count = Math.max(names.length, values.length);
         this.actions.push({
             op: "var",
             count,
-            names,
-            values,
+            ...(!!names && {names}),
+            ...(!!values && {values}),
             type,
         })
     }

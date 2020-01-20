@@ -2,13 +2,21 @@
 var assert = require("assert");
 var path = require("path");
 var fs = require("fs");
-var parser = require("../src/parser");
 var { js2wy, js2asc } = require("../src/js2wy/js2wy");
 const logDir = path.join(__dirname, "log");
 try {
   fs.mkdirSync(logDir);
 // eslint-disable-next-line no-empty
 } catch (e) {}
+var parser = require("@wenyanlang/core");
+function wy2asc(txt) {
+  function ass(msg, pos, b) {
+    if (!b) console.error(`ERROR@${pos}: ${msg}`);
+  }
+
+  const tokens = parser.wy2tokens(txt, ass);
+  return parser.tokens2asc(tokens, ass);
+}
 
 const _log = console.log;
 function runTestCase(file) {
@@ -38,7 +46,7 @@ function runTestCase(file) {
     // fs.writeFileSync('error.gen.asc.json', JSON.stringify(genAsc, null, 2), {encoding: 'utf-8'});
     genWy = js2wy(jsText);
     // fs.writeFileSync('error.gen.wy', genWy, {encoding: 'utf-8'});
-    genJs = parser.compile("js", genWy, {
+    genJs = parser.compile(genWy, {
       logCallback: () => {},
       errorCallback: (err) => {
         console.trace(err);
@@ -56,10 +64,11 @@ function runTestCase(file) {
   }
 }
 
-describe("Js => Wenyan; Js converting test (Js => Wenyan => Js)", () => {
+describe("Js => Wenyan; Js converting test (Js to Wenyan to Js)", () => {
   var files = fs.readdirSync(path.join(__dirname, "./jsTestCases/"));
   for (var i = 0; i < files.length; i++) {
     const file = path.join(__dirname, "jsTestCases", files[i]);
+    if (files[i] !== 'new.js') continue;
     it(`should convert correctly [${files[i]}]`, () => {
       runTestCase(file);
     });

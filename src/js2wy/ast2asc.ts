@@ -911,7 +911,7 @@ export function ast2asc(ast, js) {
                 _node.callee.name,
                 _node.arguments.map((x) => getTripleProp(x, false)),
             );
-        } else if (_node.callee.object.name === "console") {
+        } else if (_node.callee.object && _node.callee.object.name === "console") {
             let isShinkable = true;
             const n = _node.arguments.length;
             for (let j = 0; j < n; j++) {
@@ -983,6 +983,20 @@ export function ast2asc(ast, js) {
             }
 
             handleUniversalCallExp(_node);
+        } else if (_node.callee.type === 'CallExpression') {
+            // Example: nested(0)(5)
+            const args = [..._node.arguments];
+            let varNode = _node.callee;
+            while (varNode.type === 'CallExpression') {
+                args.splice(0, 0, ...varNode.arguments);
+                varNode = varNode.callee;
+            }
+
+            const tempNode = Object.assign(_node, {
+                callee: varNode,
+                arguments: args
+            });
+            handleCallExpression(tempNode);
         } else {
             notImpErr(_node);
         }
@@ -1123,7 +1137,11 @@ export function ast2asc(ast, js) {
                 }
                 names.push(name);
             } else {
-                let value = declarator.init.value || declarator.init.name;
+                let value = declarator.init.value;
+                if (value === undefined) {
+                    value = declarator.init.name;
+                }
+
                 const dtype = mapType(declarator.init.type || typeof value, value);
                 appendDeclaration(dtype, value, name);
                 names.push(name);
