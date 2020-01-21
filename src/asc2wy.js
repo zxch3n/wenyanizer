@@ -334,7 +334,7 @@ function asc2wy(asc) {
         } else if (node.value[0] === 'ans') {
           ans += `乃得矣。\n`;
         } else {
-          ans += `乃得 ${getValue(node.value)}。\n`;
+          ans += `乃得 ${getValue(node.value)}\n`;
         }
         break;
       case "funend":

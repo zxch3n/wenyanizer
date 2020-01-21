@@ -3,14 +3,15 @@ import {NameManager} from "./NameManager";
 type Value = [string, string|number] | [string, string|number, number];
 interface Action {
     op: 'comment' | 'var' | 'reassign' | 'op+' | any,
-    containers?: string[],
+    containers?: Value[],
     pos?: number,
     arity?: number,
     count?: number,
+    iden?: Value,
     type?: string,
-    container?: string,
-    fun?: string,
-    args?: Value[],
+    container?: Value,
+    fun?: Value,
+    args?: {name: string, type: string}[],
     name?: string,
     names?: string[],
     values?: Value[],
@@ -20,6 +21,7 @@ interface Action {
     iterator?: Value,
     lhssubs?: Value,
     rhs?: Value,
+    pop?: boolean
 }
 
 export class ActionManager {
@@ -51,7 +53,7 @@ export class ActionManager {
         })
     }
 
-    addFun(args: Value[]) {
+    addFun(args: {type: string, name: string}[]) {
         this.actions.push({
             op: "fun",
             arity: args.length,
@@ -104,12 +106,47 @@ export class ActionManager {
         })
     }
 
-    addCall(fun, args, ) {
+    addCall(func: Value, args) {
         this.actions.push({
             op: 'call',
-            fun,
+            fun: func,
             args
         })
+    }
+
+    addCallByName(funName: string, args, isFunctional: boolean=true) {
+        if (isFunctional) {
+            this.actions.push({
+                op: 'call',
+                fun: [
+                    'iden',
+                    funName
+                ],
+                args
+            })
+        } else {
+            if (args.length) {
+                for (const arg of args) {
+                    this.actions.push({
+                        op: 'temp',
+                        iden: arg
+                    })
+                }
+
+                this.actions.push({
+                    op: 'take',
+                    count: args.length
+                })
+            }
+
+            this.actions.push({
+                op: 'call',
+                fun: [
+                    'iden',
+                    funName
+                ]
+            })
+        }
     }
 
     addOp(op, lhs, rhs, name=undefined) {
@@ -139,7 +176,7 @@ export class ActionManager {
     addPush(container: string, values: Value[]) {
         this.actions.push({
             op: 'push',
-            container,
+            container: ['iden', container],
             values
         })
     }
@@ -160,7 +197,7 @@ export class ActionManager {
     addFor(container: string, iterator: Value) {
         this.actions.push({
             op: 'for',
-            container,
+            container: ['iden', container],
             iterator
         })
     }
@@ -200,7 +237,7 @@ export class ActionManager {
     addSubscript(container: string, value: Value) {
         this.actions.push({
             op: 'subscript',
-            container,
+            container: ['iden', container],
             value
         })
     }
@@ -208,7 +245,7 @@ export class ActionManager {
     addLength(container: string) {
         this.actions.push({
             op: 'length',
-            container
+            container: ['iden', container]
         })
     }
 
@@ -222,7 +259,7 @@ export class ActionManager {
     addCat(containers: string[]) {
         this.actions.push({
             op: 'cat',
-            containers
+            containers: containers.map(x => ['iden', x])
         })
     }
 

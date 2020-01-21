@@ -288,6 +288,7 @@ export function ast2asc(ast, js) {
             case "UnaryExpression":
                 wrapUnaryExpression(_node);
                 break;
+            case "ArrowFunctionExpression":
             case "FunctionExpression": {
                 wrapFunctionExpression(_node);
                 break;
@@ -494,8 +495,11 @@ export function ast2asc(ast, js) {
                     args.push(name);
                 }
                 signature += ")";
+            } else if (target.type === 'NewExpression') {
+                // FIXME
+                signature += `new ${target.callee.name}(${target.arguments.map(x => getTripleProp(x, false)[1])})`;
             } else {
-                notImpErr();
+                notImpErr(_node);
             }
         }
 
@@ -519,9 +523,10 @@ export function ast2asc(ast, js) {
             actionManager.addFunEnd();
         }
 
-        actionManager.addCall(
+        actionManager.addCallByName(
             funcName,
             _node.arguments.map((x) => getTripleProp(x, false)),
+            false
         );
     }
 
@@ -538,18 +543,40 @@ export function ast2asc(ast, js) {
 
     function wrapJsNewExpression(_node) {
         assertStrongly(_node.type === "NewExpression", _node);
-        wrapJsNativeFunction(
-            NEW_SIGNATURE,
-            NEW_FUNC_NAME,
-            [{type: "obj", name: "蓝图"}],
-            "new 蓝图(...Array.prototype.slice.call(arguments, 1))"
-        );
+        if (!(NEW_SIGNATURE in signatureCache)) {
+            addVarOp([NEW_FUNC_NAME], [], "fun", true);
+            polyfillAM.addFun([{type: "obj", name: "蓝图"}]);
+            polyfillAM.addFunBody();
 
-        actionManager.addCall(
+                addVarOp(['参数'], [], "arr", true);
+                addVarOp(['子造物'], [], "fun", true);
+                polyfillAM.addFun([{type: "obj", name: "甲"}]);
+                polyfillAM.addFunBody();
+                polyfillAM.addIf([
+                        ['iden', '甲'],
+                        ['cmp', '=='],
+                        ['lit', '"乃止"']
+                    ]);
+
+                    polyfillAM.addReturn(['data', 'new 蓝图(...参数)']);
+                    polyfillAM.addElse();
+                    polyfillAM.addPush('参数', [['iden', '甲']]);
+                    polyfillAM.addReturn(['iden', '子造物']);
+
+                polyfillAM.addEnd();
+                polyfillAM.addFunEnd();
+                polyfillAM.addReturn(['iden', '子造物']);
+
+            polyfillAM.addFunEnd();
+            signatureCache[NEW_SIGNATURE] = NEW_FUNC_NAME;
+        }
+
+        actionManager.addCallByName(
             NEW_FUNC_NAME,
             [_node.callee]
                 .concat(_node.arguments)
-                .map((x) => getTripleProp(x, false))
+                .map((x) => getTripleProp(x, false)).concat([['lit', '"乃止"']]),
+            false
         );
     }
 
@@ -580,9 +607,10 @@ export function ast2asc(ast, js) {
             "對象[域]"
         );
 
-        actionManager.addCall(
+        actionManager.addCallByName(
             JS_SUBSCRIPT_FUN,
-            [obj, field]
+            [obj, field],
+            false
         );
     }
 
@@ -598,9 +626,10 @@ export function ast2asc(ast, js) {
             "對象[域] = 值;"
         );
 
-        actionManager.addCall(
+        actionManager.addCallByName(
             INDEX_ASSIGN_FUNC,
-            [lhs, lhssubs, rhs]
+            [lhs, lhssubs, rhs],
+            false
         );
     }
 
@@ -652,6 +681,7 @@ export function ast2asc(ast, js) {
             _node.type === "LogicalExpression" ||
             _node.type === "ObjectExpression" ||
             _node.type === "FunctionExpression" ||
+            _node.type === "ArrowFunctionExpression" ||
             _node.type === "NewExpression"
         ) {
             // TODO: remove this hotfix in the future version
@@ -700,6 +730,7 @@ export function ast2asc(ast, js) {
             return getTripleProp(_node.left)
         }
 
+
         tryTurnThisExpressionToIdentifier(_node);
         if (!(_node.type in LITERAL_TYPES)) {
             notImpErr(_node);
@@ -726,7 +757,7 @@ export function ast2asc(ast, js) {
 
     function handleUniversalCallExp(_node) {
         if (nameManager.has(_node.callee.name)) {
-            actionManager.addCall(
+            actionManager.addCallByName(
                 _node.callee.name,
                 _node.arguments.map((x) => getTripleProp(x, false)),
             );
@@ -779,7 +810,15 @@ export function ast2asc(ast, js) {
             nameManager.registerName(funcNode.id.name, "fun");
         }
         actionManager.addFunBody();
-        processNodesAndHandlePostProcess(funcNode.body.body);
+        if (funcNode.type === 'ArrowFunctionExpression') {
+            if (funcNode.body.body) {
+                processNodesAndHandlePostProcess(funcNode.body.body);
+            } else {
+                actionManager.addReturn(getTripleProp(funcNode.body));
+            }
+        } else {
+            processNodesAndHandlePostProcess(funcNode.body.body);
+        }
         actionManager.addFunEnd();
         // clear the stack
         actionManager.addDiscard();
@@ -907,7 +946,7 @@ export function ast2asc(ast, js) {
 
     function handleCallExpression(_node) {
         if (_node.callee.type === "Identifier") {
-            actionManager.addCall(
+            actionManager.addCallByName(
                 _node.callee.name,
                 _node.arguments.map((x) => getTripleProp(x, false)),
             );
@@ -997,6 +1036,9 @@ export function ast2asc(ast, js) {
                 arguments: args
             });
             handleCallExpression(tempNode);
+        } else if (_node.callee.type.endsWith('ArrowFunctionExpression' )) {
+            const callee = getTripleProp(_node.callee, false);
+            actionManager.addCall(callee, _node.arguments.map(x => getTripleProp(x, false)));
         } else {
             notImpErr(_node);
         }
@@ -1136,6 +1178,12 @@ export function ast2asc(ast, js) {
                     addNamingOp([name]);
                 }
                 names.push(name);
+            } else if (
+                declarator.init.type === 'AssignmentExpression'
+            ) {
+                process(declarator.init);
+                const newNode = Object.assign(_node, {declarations: [{...declarator, init: declarator.init.right}]});
+                handleDeclaration(newNode);
             } else {
                 let value = declarator.init.value;
                 if (value === undefined) {
