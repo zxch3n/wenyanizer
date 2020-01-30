@@ -7,8 +7,9 @@ interface Action {
     pos?: number,
     arity?: number,
     count?: number,
-    iden?: Value,
+    iden?: Value | string[],
     type?: string,
+    del?: boolean,
     container?: Value,
     fun?: Value,
     args?: {name: string, type: string}[],
@@ -21,7 +22,9 @@ interface Action {
     iterator?: Value,
     lhssubs?: Value,
     rhs?: Value,
-    pop?: boolean
+    error?: Value,
+    pop?: boolean,
+    file?: string,
 }
 
 export class ActionManager {
@@ -210,6 +213,10 @@ export class ActionManager {
 
     addReassign(lhs, rhs, lhssubs: undefined|Value=undefined) {
         if (lhssubs == null) {
+            if (lhs[1] == rhs[1] && lhs[0] == rhs[0]) {
+                return;
+            }
+
             this.actions.push({
                 op: 'reassign',
                 lhs,
@@ -267,6 +274,56 @@ export class ActionManager {
         this.actions.push({
             op: "comment",
             value: ['lit', `"${comment}"`]
+        })
+    }
+
+    addThrow(error: Value){
+        this.actions.push({
+            op: 'throw',
+            error
+        })
+    }
+
+    addTry() {
+        this.actions.push({
+            op: 'try'
+        })
+    }
+
+    addCatch() {
+        this.actions.push({
+            op: 'catch'
+        })
+    }
+
+    addCatchErr(error: Value|undefined) {
+        this.actions.push({
+            op: 'catcherr',
+            error: error
+        })
+    }
+
+    addTryEnd() {
+        this.actions.push({
+            op: 'tryend',
+        })
+    }
+
+    addImport(file, iden: string[]) {
+        this.actions.push({
+            op: 'import',
+            file,
+            iden
+        })
+    }
+
+    addDelete(lhs, lhssubs) {
+        this.actions.push({
+            op: 'reassign',
+            lhs,
+            lhssubs,
+            rhs: undefined,
+            del: true
         })
     }
 

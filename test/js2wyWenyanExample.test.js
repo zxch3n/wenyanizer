@@ -43,7 +43,8 @@ function runExample(name) {
     try {
       eval(jsText);
     } catch (e) {
-      throw e;
+      console.trace(e);
+      data = e.toString();
     }
     console.log = _log;
     return data;
@@ -94,8 +95,9 @@ describe("Js => Wenyan; Wenyan examples test", () => {
   var files = fs.readdirSync(path.join(__dirname, "../examples/"));
   for (var i = 0; i < files.length; i++) {
     const name = files[i].split(".")[0];
+    // if (name !== 'try') continue;
     it (`should convert wenyan back to js [${name}]`, () => {
       runExample(name);
     })
   }
-})
+});

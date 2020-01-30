@@ -26,10 +26,37 @@ export function js2wy(jsStr) {
   return asc2wy(asc);
 }
 
+function preprocessAst(asc) {
+  renameAnsIdentifier(asc);
+}
+
+function renameAnsIdentifier(node) {
+  if (node === undefined || !(node instanceof Object)) return;
+  if (node.type === 'Identifier' && (node.name.startsWith('_ans') || node.name.startsWith('_rand'))) {
+    node.name = '_' + node.name;
+    return;
+  }
+
+  if (node instanceof Array) {
+    for (const subNode of node) {
+      renameAnsIdentifier(subNode);
+    }
+
+    return;
+  }
+
+  for (const key in node) {
+    if (node.hasOwnProperty(key)) {
+      renameAnsIdentifier(node[key]);
+    }
+  }
+}
+
 export function js2asc(jsStr) {
   let jsAst: File, asc;
   try {
     jsAst = parse(jsStr);
+    preprocessAst(jsAst)
   } catch (e) {
     e.message = "[JavaScript Grammar Error] " + e.message;
     throw e;

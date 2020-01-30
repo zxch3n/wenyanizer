@@ -2,6 +2,20 @@ var solveSudoku = function(board) {
   sudoku(board, 0, 0);
 };
 
+function isValidVal(board, x, y, val) {
+  for (let i = 0; i < 9; i++) {
+    if (i !== y && board[x][i] === val) return false;
+    if (i !== x && board[i][y] === val) return false;
+    if (
+        board[3 * Math.floor(x / 3) + Math.floor(i / 3)][
+        3 * Math.floor(y / 3) + (i % 3)
+            ] === val
+    )
+      return false;
+  }
+  return true;
+}
+
 function sudoku(board, x, y) {
   if (y === 0 && x === 9) return true;
   if (board[x][y] !== ".") {
@@ -24,20 +38,6 @@ function sudoku(board, x, y) {
   }
 
   return false;
-}
-
-function isValidVal(board, x, y, val) {
-  for (let i = 0; i < 9; i++) {
-    if (i !== y && board[x][i] === val) return false;
-    if (i !== x && board[i][y] === val) return false;
-    if (
-      board[3 * Math.floor(x / 3) + Math.floor(i / 3)][
-        3 * Math.floor(y / 3) + (i % 3)
-      ] === val
-    )
-      return false;
-  }
-  return true;
 }
 
 function getNext(x, y) {

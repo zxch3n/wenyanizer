@@ -308,6 +308,17 @@ export function ast2asc(ast, js) {
                 break;
             case "EmptyStatement":
                 break;
+            case "ThrowStatement":
+                actionManager.addThrow(getTripleProp(_node.argument, false));
+                break;
+            case "TryStatement":
+                actionManager.addTry();
+                processNodesAndHandlePostProcess(_node.block.body);
+                actionManager.addCatch();
+                actionManager.addName([_node.handler.param.name]);
+                processNodesAndHandlePostProcess(_node.handler.body.body);
+                actionManager.addTryEnd();
+                break;
             default:
                 notImpErr(_node);
         }
@@ -887,6 +898,11 @@ export function ast2asc(ast, js) {
             case "UpdateExpression":
                 handleUpdateExpression(_node);
                 break;
+            case "UnaryExpression":
+                if (_node.operator === 'delete') {
+                    actionManager.addDelete(getTripleProp(_node.argument.object), getTripleProp(_node.argument.property));
+                }
+                break;
             default:
                 notImpErr(_node, `Unknown expression ${_node.expression.type}`);
         }
@@ -1096,6 +1112,16 @@ export function ast2asc(ast, js) {
         }
 
         tryTurnThisExpressionToIdentifier(_node.left.object);
+        if (_node.left.object.type === 'CallExpression') {
+            const trip = getTripleProp(_node.left.object, false);
+            _node.left.object = Object.assign(_node.left.object, {
+                type: 'Identifier',
+                callee: undefined,
+                name: trip[1],
+                arguments: undefined
+            })
+        }
+
         if (_node.left.object.type !== "Identifier" && !lhsName) {
             notImpErr(_node);
         }
@@ -1182,7 +1208,7 @@ export function ast2asc(ast, js) {
                 declarator.init.type === 'AssignmentExpression'
             ) {
                 process(declarator.init);
-                const newNode = Object.assign(_node, {declarations: [{...declarator, init: declarator.init.right}]});
+                const newNode = Object.assign(_node, {declarations: [{...declarator, init: declarator.init.left}]});
                 handleDeclaration(newNode);
             } else {
                 let value = declarator.init.value;

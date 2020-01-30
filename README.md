@@ -161,7 +161,7 @@ You can check the full list of polyfills in [HACKS.md](./doc/HACKS.md).
 
 | Name | Status |
 |:-----------------|:-------|
-| JS Code Compiled From Wenyan | ✔    |
+| JS Code Compiled From Wenyan |  ❌  |
 | Closure      |  ✔    |
 | Control: While/For/If/Else      | ✔    |
 | Object `var a = {a: 0, b: 1, c: 2}`  |  ✔  |

@@ -30,8 +30,8 @@ function runTestCase(file) {
     try {
       eval(jsText);
     } catch (e) {
-      console.log("Run Error");
-      throw e;
+      console.trace(e);
+      data = e.toString();
     }
     console.log = _log;
     return data;
@@ -68,7 +68,7 @@ describe("Js => Wenyan; Js converting test (Js to Wenyan to Js)", () => {
   var files = fs.readdirSync(path.join(__dirname, "./jsTestCases/"));
   for (var i = 0; i < files.length; i++) {
     const file = path.join(__dirname, "jsTestCases", files[i]);
-    // if (files[i] !== 'new.js') continue;
+    if (files[i] !== 'sudoku.js') continue;
     it(`should convert correctly [${files[i]}]`, () => {
       runTestCase(file);
     });
